@@ -21,6 +21,7 @@ except ImportError:
 
 from config.config import (
     OPENAI_API_KEY,
+    OPENAI_BASE_URL,
     LLM_MODEL,
     LLM_TEMPERATURE,
     LLM_MAX_TOKENS,
@@ -163,13 +164,14 @@ class FileClassifier:
     "reason": "폴더명을 추천한 이유"
 }}"""
 
-    def __init__(self, api_key: Optional[str] = None, model: str = None):
+    def __init__(self, api_key: Optional[str] = None, base_url: Optional[str] = None, model: Optional[str] = None):
         """
         FileClassifier 초기화
 
         Args:
             api_key (Optional[str]): OpenAI API 키. None이면 환경변수에서 로드
-            model (str): 사용할 모델명. None이면 설정값 사용
+            base_url (Optional[str]): OpenAI 호환 Base URL. None이면 환경변수에서 로드
+            model (Optional[str]): 사용할 모델명. None이면 설정값 사용
 
         Raises:
             ValueError: API 키가 없을 경우
@@ -180,6 +182,9 @@ class FileClassifier:
             logger.error("OPENAI_API_KEY가 설정되지 않았습니다")
             raise ValueError("OPENAI_API_KEY 환경 변수가 필요합니다")
 
+        # Base URL 설정
+        self.base_url = base_url or OPENAI_BASE_URL
+
         # 모델 설정
         self.model = model or LLM_MODEL
         self.temperature = LLM_TEMPERATURE
@@ -187,9 +192,9 @@ class FileClassifier:
         self.timeout = TIMEOUT
 
         # OpenAI 클라이언트 초기화
-        self.client = OpenAI(api_key=self.api_key)
+        self.client = OpenAI(api_key=self.api_key, base_url=self.base_url)
 
-        logger.info(f"FileClassifier 초기화됨 - 모델: {self.model}")
+        logger.info(f"FileClassifier 초기화됨 - 모델: {self.model}, Base URL: {self.base_url}")
 
     def classify_file(
         self, filename: str, file_type: str, content: str

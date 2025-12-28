@@ -15,6 +15,9 @@ from pathlib import Path
 from queue import Queue
 from datetime import datetime
 
+# 설정 저장을 위해 import
+from config.config import save_to_env, OPENAI_API_KEY, OPENAI_BASE_URL, LLM_MODEL
+
 logger = logging.getLogger(__name__)
 
 
@@ -35,6 +38,107 @@ FONTS = {
     'small': ('Arial', 9),
     'mono': ('Courier', 9),
 }
+
+
+class SettingsDialog(tk.Toplevel):
+    """설정 대화상자"""
+
+    def __init__(self, parent):
+        super().__init__(parent)
+        self.title("설정")
+        self.geometry("500x400")
+        self.resizable(False, False)
+        self.parent = parent
+
+        self.api_key_var = tk.StringVar(value=OPENAI_API_KEY)
+        self.base_url_var = tk.StringVar(value=OPENAI_BASE_URL)
+        self.model_var = tk.StringVar(value=LLM_MODEL)
+        self.provider_var = tk.StringVar(value="OpenAI")
+
+        self._setup_ui()
+
+    def _setup_ui(self):
+        main_frame = ttk.Frame(self, padding="20")
+        main_frame.pack(fill=tk.BOTH, expand=True)
+
+        # Provider Selection
+        ttk.Label(main_frame, text="API 제공자 선택:", font=FONTS['normal']).pack(anchor=tk.W, pady=(0, 5))
+        provider_combo = ttk.Combobox(
+            main_frame,
+            textvariable=self.provider_var,
+            values=["OpenAI", "Ollama (Local)", "Custom"],
+            state="readonly"
+        )
+        provider_combo.pack(fill=tk.X, pady=(0, 15))
+        provider_combo.bind("<<ComboboxSelected>>", self._on_provider_change)
+
+        # API Key
+        ttk.Label(main_frame, text="API Key:", font=FONTS['normal']).pack(anchor=tk.W, pady=(0, 5))
+        self.api_key_entry = ttk.Entry(main_frame, textvariable=self.api_key_var, show="*")
+        self.api_key_entry.pack(fill=tk.X, pady=(0, 5))
+
+        # Base URL
+        ttk.Label(main_frame, text="Base URL:", font=FONTS['normal']).pack(anchor=tk.W, pady=(0, 5))
+        self.base_url_entry = ttk.Entry(main_frame, textvariable=self.base_url_var)
+        self.base_url_entry.pack(fill=tk.X, pady=(0, 15))
+
+        # Model
+        ttk.Label(main_frame, text="모델 이름:", font=FONTS['normal']).pack(anchor=tk.W, pady=(0, 5))
+        self.model_entry = ttk.Entry(main_frame, textvariable=self.model_var)
+        self.model_entry.pack(fill=tk.X, pady=(0, 20))
+
+        # Buttons
+        btn_frame = ttk.Frame(main_frame)
+        btn_frame.pack(fill=tk.X, pady=10)
+
+        ttk.Button(btn_frame, text="저장", command=self._save_settings).pack(side=tk.RIGHT, padx=5)
+        ttk.Button(btn_frame, text="취소", command=self.destroy).pack(side=tk.RIGHT, padx=5)
+
+        # Initial check
+        self._check_provider_preset()
+
+    def _check_provider_preset(self):
+        """현재 URL에 따라 Provider 콤보박스 설정"""
+        url = self.base_url_var.get()
+        if "api.openai.com" in url:
+            self.provider_var.set("OpenAI")
+        elif "localhost" in url or "127.0.0.1" in url:
+            self.provider_var.set("Ollama (Local)")
+        else:
+            self.provider_var.set("Custom")
+
+    def _on_provider_change(self, event):
+        provider = self.provider_var.get()
+        if provider == "OpenAI":
+            self.base_url_var.set("https://api.openai.com/v1")
+            if not self.model_var.get():
+                self.model_var.set("gpt-3.5-turbo")
+        elif provider == "Ollama (Local)":
+            self.base_url_var.set("http://localhost:11434/v1")
+            self.api_key_var.set("ollama") # Dummy key
+            if not self.model_var.get():
+                self.model_var.set("llama3")
+
+    def _save_settings(self):
+        api_key = self.api_key_var.get().strip()
+        base_url = self.base_url_var.get().strip()
+        model = self.model_var.get().strip()
+
+        if not api_key:
+            messagebox.showerror("오류", "API Key를 입력해주세요.")
+            return
+
+        try:
+            save_to_env(api_key, base_url, model)
+            messagebox.showinfo("성공", "설정이 저장되었습니다.\n프로그램이 새 설정을 사용하도록 업데이트됩니다.")
+
+            # 부모 창에 설정 변경 알림 (재초기화 요청)
+            if hasattr(self.parent, 'on_settings_changed') and self.parent.on_settings_changed:
+                 self.parent.on_settings_changed()
+
+            self.destroy()
+        except Exception as e:
+            messagebox.showerror("오류", f"설정 저장 실패: {e}")
 
 
 class FileClassifierGUI:
@@ -88,6 +192,7 @@ class FileClassifierGUI:
         self.on_undo: Optional[Callable] = None
         self.on_redo: Optional[Callable] = None
         self.on_export_log: Optional[Callable] = None
+        self.on_settings_changed: Optional[Callable] = None
         
         # UI 생성
         self._setup_ui()
@@ -96,6 +201,16 @@ class FileClassifierGUI:
         self._check_ui_queue()
         
         logger.info("GUI 초기화 완료")
+
+        # 초기 설정 확인 (API 키 없으면 설정창 띄우기)
+        self.root.after(500, self._check_initial_config)
+
+    def _check_initial_config(self):
+        """초기 설정 확인 및 설정창 표시"""
+        from config.config import OPENAI_API_KEY
+        if not OPENAI_API_KEY:
+             if messagebox.askyesno("초기 설정", "API 키가 설정되지 않았습니다.\n지금 설정하시겠습니까?"):
+                 self._show_settings()
     
     def _setup_ui(self) -> None:
         """
@@ -159,7 +274,7 @@ class FileClassifierGUI:
         # Help 메뉴
         help_menu = tk.Menu(menubar, tearoff=0)
         menubar.add_cascade(label="도움말(H)", menu=help_menu)
-        help_menu.add_command(label="설정", command=self._show_settings)
+        help_menu.add_command(label="설정...", command=self._show_settings)
         help_menu.add_command(label="도움말 및 설명서", command=self._show_help)
         help_menu.add_separator()
         help_menu.add_command(label="정보", command=self._show_about)
@@ -655,14 +770,7 @@ class FileClassifierGUI:
         """
         설정 대화 표시
         """
-        messagebox.showinfo(
-            "설정",
-            "설정 기능\n\n"
-            "- 모니터링 폴더\n"
-            "- 모니터링 파일 확장자\n"
-            "- LLM 설정\n"
-            "- 로깅 레벨"
-        )
+        SettingsDialog(self)
     
     def _show_history(self) -> None:
         """
@@ -880,6 +988,12 @@ class FileClassifierGUI:
             callback (Callable): 콜백 함수
         """
         self.on_export_log = callback
+
+    def set_on_settings_changed(self, callback: Callable) -> None:
+        """
+        설정 변경 콜백 설정
+        """
+        self.on_settings_changed = callback
 
 
 if __name__ == "__main__":
