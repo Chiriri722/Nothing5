@@ -73,6 +73,29 @@ class FileClassifier:
         "flac": "음악",
         "aac": "음악",
         "m4a": "음악",
+        # 압축
+        "zip": "압축파일",
+        "rar": "압축파일",
+        "7z": "압축파일",
+        "tar": "압축파일",
+        "gz": "압축파일",
+    }
+
+    # 계층적 필터링을 위한 규칙 정의 (확장자 -> 폴더명)
+    EXTENSION_RULES = {
+        "jpg": "이미지", "jpeg": "이미지", "png": "이미지", "gif": "이미지",
+        "bmp": "이미지", "svg": "이미지", "webp": "이미지",
+        "mp3": "오디오", "wav": "오디오", "flac": "오디오", "aac": "오디오", "m4a": "오디오",
+        "mp4": "비디오", "avi": "비디오", "mov": "비디오", "mkv": "비디오", "flv": "비디오",
+        "zip": "압축파일", "rar": "압축파일", "7z": "압축파일", "tar": "압축파일", "gz": "압축파일",
+        "py": "코드", "js": "코드", "java": "코드", "cpp": "코드", "c": "코드", "html": "코드", "css": "코드"
+    }
+
+    # 키워드 규칙 (키워드 -> 폴더명)
+    KEYWORD_RULES = {
+        "invoice": "청구서", "receipt": "영수증", "report": "보고서",
+        "bill": "청구서", "contract": "계약서", "manual": "매뉴얼",
+        "screenshot": "스크린샷"
     }
 
     # 금지된 폴더명 (시스템 예약어)
@@ -102,7 +125,7 @@ class FileClassifier:
 - 파일 타입: {file_type}
 - 콘텐츠 길이: {content_length}
 
-파일 내용 (처음 1000자):
+파일 내용 (요약 혹은 발췌):
 {content}
 
 다음 규칙을 고려하여 폴더명을 추천해주세요:
@@ -199,8 +222,15 @@ class FileClassifier:
                 logger.error(error_msg)
                 return self._create_fallback_result(filename, file_type, error_msg)
 
-            # 콘텐츠 길이 제한 (너무 길면 앞 부분만 사용)
-            truncated_content = content[:1000] if content else ""
+            # 1. 계층적 필터링 (규칙 기반 분류)
+            rule_based_result = self.check_rules(filename, file_type)
+            if rule_based_result:
+                logger.info(f"규칙 기반 분류 성공: {filename} -> {rule_based_result['folder_name']}")
+                return rule_based_result
+
+            # 콘텐츠 길이 제한 (Smart Summary 고려하여 2500자까지 허용)
+            # Extractor에서 이미 요약했더라도, 여기서 한번 더 안전장치
+            truncated_content = content[:2500] if content else ""
             content_length = len(content) if content else 0
 
             # 프롬프트 생성
@@ -261,6 +291,44 @@ class FileClassifier:
             logger.error(error_msg, exc_info=True)
             return self._create_fallback_result(filename, file_type, error_msg)
 
+    def check_rules(self, filename: str, file_type: str) -> Optional[Dict[str, Any]]:
+        """
+        규칙 기반 분류 (Hierarchical Filtering)
+
+        Args:
+            filename (str): 파일명
+            file_type (str): 파일 확장자 (점 제외)
+
+        Returns:
+            Optional[Dict[str, Any]]: 분류 결과가 있으면 반환, 없으면 None
+        """
+        file_type_lower = file_type.lower()
+        filename_lower = filename.lower()
+
+        # 1. 키워드 기반 규칙
+        for keyword, folder in self.KEYWORD_RULES.items():
+            if keyword in filename_lower:
+                return {
+                    "status": ClassificationStatus.SUCCESS.value,
+                    "folder_name": folder,
+                    "category": self.FILE_TYPE_MAPPING.get(file_type_lower, "기타"),
+                    "confidence": 1.0,
+                    "reason": f"파일명 키워드 매칭 ('{keyword}')"
+                }
+
+        # 2. 확장자 기반 규칙
+        if file_type_lower in self.EXTENSION_RULES:
+            folder_name = self.EXTENSION_RULES[file_type_lower]
+            return {
+                "status": ClassificationStatus.SUCCESS.value,
+                "folder_name": folder_name,
+                "category": self.FILE_TYPE_MAPPING.get(file_type_lower, "기타"),
+                "confidence": 0.95,
+                "reason": f"확장자 기반 규칙 ('{file_type}')"
+            }
+
+        return None
+
     def classify_image(self, image_path: str) -> Dict[str, Any]:
         """
         이미지를 Vision API를 사용하여 분류합니다.
@@ -282,6 +350,12 @@ class FileClassifier:
 
             filename = Path(image_path).name
             file_type = Path(image_path).suffix.lstrip(".").lower()
+
+            # 1. 계층적 필터링 (규칙 기반 분류)
+            rule_based_result = self.check_rules(filename, file_type)
+            if rule_based_result:
+                 logger.info(f"규칙 기반 이미지 분류 성공: {filename} -> {rule_based_result['folder_name']}")
+                 return rule_based_result
 
             # 이미지 파일 확인
             if not self._is_image_file(file_type):
