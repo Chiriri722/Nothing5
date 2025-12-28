@@ -199,6 +199,13 @@ class FileClassifier:
                 logger.error(error_msg)
                 return self._create_fallback_result(filename, file_type, error_msg)
 
+            # 1. 계층적 필터링 (Hierarchical Filtering)
+            # LLM 호출 전에 규칙 기반으로 먼저 분류를 시도하여 비용 절감
+            rule_based_result = self._check_rules(filename, file_type)
+            if rule_based_result:
+                logger.info(f"규칙 기반 분류 성공: {filename} -> {rule_based_result['folder_name']}")
+                return rule_based_result
+
             # 콘텐츠 길이 제한 (너무 길면 앞 부분만 사용)
             truncated_content = content[:1000] if content else ""
             content_length = len(content) if content else 0
@@ -574,3 +581,56 @@ class FileClassifier:
         """
         with open(image_path, "rb") as image_file:
             return base64.b64encode(image_file.read()).decode("utf-8")
+
+    def _check_rules(self, filename: str, file_type: str) -> Optional[Dict[str, Any]]:
+        """
+        규칙 기반 분류를 수행합니다.
+
+        Args:
+            filename (str): 파일명
+            file_type (str): 파일 타입
+
+        Returns:
+            Optional[Dict[str, Any]]: 분류 결과 (매칭되는 규칙이 없으면 None)
+        """
+        # 1. 명확한 확장자 규칙
+        extension_rules = {
+            "mp3": "음악", "wav": "음악", "flac": "음악",
+            "mp4": "비디오", "avi": "비디오", "mkv": "비디오",
+            "zip": "압축파일", "rar": "압축파일", "7z": "압축파일",
+            "exe": "설치파일", "msi": "설치파일", "apk": "설치파일",
+            "py": "소스코드", "js": "소스코드", "html": "소스코드", "css": "소스코드"
+        }
+
+        lower_type = file_type.lower()
+        if lower_type in extension_rules:
+            folder_name = extension_rules[lower_type]
+            return {
+                "status": ClassificationStatus.SUCCESS.value,
+                "folder_name": folder_name,
+                "category": self.FILE_TYPE_MAPPING.get(lower_type, "기타"),
+                "confidence": 1.0,
+                "reason": f"확장자 규칙 ({lower_type})"
+            }
+
+        # 2. 키워드 규칙 (파일명에 특정 단어가 포함된 경우)
+        keyword_rules = [
+            (r"(?i)invoice|영수증|bill|receipt", "영수증"),
+            (r"(?i)contract|계약서", "계약서"),
+            (r"(?i)manual|매뉴얼|사용설명서", "매뉴얼"),
+            (r"(?i)schedule|일정표|계획표", "일정"),
+            (r"(?i)screenshot|스크린샷", "스크린샷"),
+            (r"(?i)scan|스캔", "스캔문서"),
+        ]
+
+        for pattern, folder in keyword_rules:
+            if re.search(pattern, filename):
+                return {
+                    "status": ClassificationStatus.SUCCESS.value,
+                    "folder_name": folder,
+                    "category": "문서",
+                    "confidence": 0.95,
+                    "reason": f"키워드 규칙 ({folder})"
+                }
+
+        return None
