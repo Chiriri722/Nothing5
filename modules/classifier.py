@@ -19,6 +19,19 @@ try:
 except ImportError:
     raise ImportError("openai 패키지가 설치되지 않았습니다. 'pip install openai' 실행해주세요.")
 
+# Optional providers
+try:
+    import google.generativeai as genai
+    HAS_GEMINI = True
+except ImportError:
+    HAS_GEMINI = False
+
+try:
+    import anthropic
+    HAS_CLAUDE = True
+except ImportError:
+    HAS_CLAUDE = False
+
 from config.config import (
     OPENAI_API_KEY,
     LLM_MODEL,
@@ -26,6 +39,7 @@ from config.config import (
     LLM_MAX_TOKENS,
     TIMEOUT,
 )
+import config.config as cfg
 
 logger = logging.getLogger(__name__)
 
@@ -164,9 +178,38 @@ class FileClassifier:
         self.timeout = TIMEOUT
 
         # OpenAI 클라이언트 초기화
-        self.client = OpenAI(api_key=self.api_key)
+        self.client = None
+        self.genai_configured = False
+        self.claude_client = None
 
-        logger.info(f"FileClassifier 초기화됨 - 모델: {self.model}")
+        if cfg.CREDENTIAL_SOURCE == "gemini":
+            if not HAS_GEMINI:
+                logger.error("google-generativeai 패키지가 설치되지 않았습니다.")
+            else:
+                try:
+                    genai.configure(api_key=self.api_key)
+                    self.genai_configured = True
+                    logger.info("Gemini API configured")
+                except Exception as e:
+                    logger.error(f"Gemini configuration error: {e}")
+
+        elif cfg.CREDENTIAL_SOURCE == "claude":
+            if not HAS_CLAUDE:
+                logger.error("anthropic 패키지가 설치되지 않았습니다.")
+            else:
+                try:
+                    self.claude_client = anthropic.Anthropic(api_key=self.api_key)
+                    logger.info("Claude API configured")
+                except Exception as e:
+                    logger.error(f"Claude configuration error: {e}")
+        else:
+            # Default to OpenAI
+            try:
+                self.client = OpenAI(api_key=self.api_key)
+            except Exception as e:
+                logger.warning(f"OpenAI Client Init Warning: {e}")
+
+        logger.info(f"FileClassifier 초기화됨 - 모델: {self.model}, 소스: {cfg.CREDENTIAL_SOURCE}")
 
     def classify_file(
         self, filename: str, file_type: str, content: str
@@ -331,7 +374,7 @@ class FileClassifier:
 
     def _call_api(self, prompt: str) -> str:
         """
-        OpenAI API를 호출합니다.
+        설정된 LLM API를 호출합니다.
 
         Args:
             prompt (str): 프롬프트
@@ -339,8 +382,18 @@ class FileClassifier:
         Returns:
             str: API 응답 텍스트
         """
-        logger.debug(f"API 호출 - 모델: {self.model}")
+        logger.debug(f"API 호출 - 모델: {self.model}, 소스: {cfg.CREDENTIAL_SOURCE}")
 
+        if cfg.CREDENTIAL_SOURCE == "gemini" and self.genai_configured:
+            return self._call_gemini(prompt)
+        elif cfg.CREDENTIAL_SOURCE == "claude" and self.claude_client:
+            return self._call_claude(prompt)
+        elif self.client:
+            return self._call_openai(prompt)
+        else:
+            raise ValueError("사용 가능한 LLM 클라이언트가 없습니다.")
+
+    def _call_openai(self, prompt: str) -> str:
         response = self.client.chat.completions.create(
             model=self.model,
             messages=[{"role": "user", "content": prompt}],
@@ -348,8 +401,43 @@ class FileClassifier:
             max_tokens=self.max_tokens,
             timeout=self.timeout,
         )
-
         return response.choices.message.content
+
+    def _call_gemini(self, prompt: str) -> str:
+        try:
+            # gemini-pro 등 모델명 매핑 또는 그대로 사용
+            model_name = self.model if "gemini" in self.model else "gemini-pro"
+            model = genai.GenerativeModel(model_name)
+
+            # Generation Config
+            generation_config = genai.types.GenerationConfig(
+                temperature=self.temperature,
+                max_output_tokens=self.max_tokens
+            )
+
+            response = model.generate_content(prompt, generation_config=generation_config)
+            return response.text
+        except Exception as e:
+            logger.error(f"Gemini API Error: {e}")
+            raise
+
+    def _call_claude(self, prompt: str) -> str:
+        try:
+            # Claude 3 모델명 확인 (claude-3-opus-20240229, claude-3-sonnet-20240229, etc)
+            model_name = self.model if "claude" in self.model else "claude-3-haiku-20240307"
+
+            message = self.claude_client.messages.create(
+                model=model_name,
+                max_tokens=self.max_tokens,
+                temperature=self.temperature,
+                messages=[
+                    {"role": "user", "content": prompt}
+                ]
+            )
+            return message.content[0].text
+        except Exception as e:
+            logger.error(f"Claude API Error: {e}")
+            raise
 
     def _call_vision_api(
         self, prompt: str, image_data: str, image_type: str

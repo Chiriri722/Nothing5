@@ -15,6 +15,8 @@ from pathlib import Path
 from queue import Queue
 from datetime import datetime
 
+from ui.settings_dialog import SettingsDialog
+
 logger = logging.getLogger(__name__)
 
 
@@ -655,14 +657,12 @@ class FileClassifierGUI:
         """
         설정 대화 표시
         """
-        messagebox.showinfo(
-            "설정",
-            "설정 기능\n\n"
-            "- 모니터링 폴더\n"
-            "- 모니터링 파일 확장자\n"
-            "- LLM 설정\n"
-            "- 로깅 레벨"
-        )
+        try:
+            dialog = SettingsDialog(self.root)
+            self.root.wait_window(dialog)
+        except Exception as e:
+            logger.error(f"Failed to open settings dialog: {e}", exc_info=True)
+            messagebox.showerror("오류", f"설정 창을 여는 중 오류가 발생했습니다: {e}")
     
     def _show_history(self) -> None:
         """
