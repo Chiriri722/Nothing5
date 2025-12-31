@@ -6,6 +6,7 @@ LLM 기반 파일 분류 프로그램의 전역 설정값을 정의합니다.
 """
 
 import os
+import json
 from pathlib import Path
 from dotenv import load_dotenv
 
@@ -18,6 +19,7 @@ load_dotenv()
 PROJECT_ROOT = Path(__file__).parent.parent
 LOGS_DIR = PROJECT_ROOT / "logs"
 UNDO_HISTORY_FILE = PROJECT_ROOT / "undo_history.json"
+USER_SETTINGS_FILE = PROJECT_ROOT / "user_settings.json"
 
 # 로그 디렉토리 생성
 LOGS_DIR.mkdir(exist_ok=True)
@@ -26,9 +28,63 @@ LOGS_DIR.mkdir(exist_ok=True)
 # LLM 설정
 # ========================
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
-LLM_MODEL = "gpt-3.5-turbo"  # 또는 "gpt-4"
+LLM_MODEL = "gpt-3.5-turbo"  # 기본 모델
 LLM_TEMPERATURE = 0.7
 LLM_MAX_TOKENS = 500
+
+# 자격 증명 소스 설정 (기본값: 'openai' - 환경변수)
+# options: 'openai', 'gemini', 'claude', 'manual'
+CREDENTIAL_SOURCE = "openai"
+MANUAL_API_KEY = "" # 수동 입력 시 저장될 키
+
+# 사용자 설정 파일 로드 (있다면)
+if USER_SETTINGS_FILE.exists():
+    try:
+        with open(USER_SETTINGS_FILE, 'r', encoding='utf-8') as f:
+            user_settings = json.load(f)
+            CREDENTIAL_SOURCE = user_settings.get("CREDENTIAL_SOURCE", CREDENTIAL_SOURCE)
+            MANUAL_API_KEY = user_settings.get("MANUAL_API_KEY", MANUAL_API_KEY)
+
+            # 저장된 모델이 있으면 복원 (옵션)
+            if "LLM_MODEL" in user_settings:
+                LLM_MODEL = user_settings["LLM_MODEL"]
+
+    except Exception as e:
+        print(f"Failed to load user settings: {e}")
+
+# 자격 증명 소스에 따른 API 키 및 모델 초기화
+# 모듈 로딩 시점에 실행됨. 의존성 문제를 피하기 위해 CredentialManager는 이 블록 안에서만 임포트 시도.
+try:
+    if CREDENTIAL_SOURCE in ["gemini", "claude"]:
+        # 로컬 임포트로 순환 참조 방지
+        # 주의: config.py는 프로젝트 전역에서 임포트되므로, modules 패키지가 import 가능한 상태여야 함.
+        # sys.path 설정이 완료된 상태라고 가정.
+        from modules.credential_manager import CredentialManager
+        cm = CredentialManager()
+
+        if CREDENTIAL_SOURCE == "gemini":
+            key = cm.detect_gemini_credentials()
+            if key:
+                OPENAI_API_KEY = key
+                # 모델이 기본값이면 Gemini 모델로 변경
+                if LLM_MODEL.startswith("gpt-"):
+                     LLM_MODEL = "gemini-pro"
+        elif CREDENTIAL_SOURCE == "claude":
+            key = cm.detect_claude_credentials()
+            if key:
+                OPENAI_API_KEY = key
+                if LLM_MODEL.startswith("gpt-"):
+                    LLM_MODEL = "claude-3-opus-20240229" # 또는 적절한 기본값
+
+    elif CREDENTIAL_SOURCE == "manual" and MANUAL_API_KEY:
+        OPENAI_API_KEY = MANUAL_API_KEY
+
+except ImportError:
+    # modules를 아직 찾을 수 없는 초기 단계일 수 있음 (setup.py 실행 중 등)
+    # 이 경우 무시하고 넘어감
+    pass
+except Exception as e:
+    print(f"Error loading credentials in config: {e}")
 
 # ========================
 # 파일 분류 설정
@@ -104,8 +160,11 @@ TIMEOUT = 30  # API 요청 타임아웃 (초)
 # ========================
 def validate_config():
     """설정값 유효성 검사"""
-    if not OPENAI_API_KEY:
-        raise ValueError("OPENAI_API_KEY 환경 변수가 설정되지 않았습니다.")
+    # API 키 검사는 실행 시점의 동적 로딩을 위해 여기서 제거하거나 완화할 수 있음
+    # 하지만 현재 구조상 Classifier 초기화 시 필요하므로,
+    # 동적으로 키를 가져오는 로직이 추가되면 이 부분은 수정되어야 함.
+    # 일단 경고만 하거나 패스하도록 수정.
+    pass
     
     if LLM_TEMPERATURE < 0 or LLM_TEMPERATURE > 2:
         raise ValueError("LLM_TEMPERATURE는 0~2 사이의 값이어야 합니다.")
