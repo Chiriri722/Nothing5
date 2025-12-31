@@ -210,11 +210,16 @@ class FileClassifierApp:
                 return
             
             file_type = file_path_obj.suffix.lstrip('.')
-            classification_result = self.classifier.classify_file(
-                filename=file_path_obj.name,
-                file_type=file_type,
-                content=content
-            )
+
+            # 이미지 파일인 경우 classify_image 사용 (Vision API)
+            if self.classifier._is_image_file(file_type):
+                classification_result = self.classifier.classify_image(file_path)
+            else:
+                classification_result = self.classifier.classify_file(
+                    filename=file_path_obj.name,
+                    file_type=file_type,
+                    content=content
+                )
             
             if classification_result.get('status') != 'success':
                 error_msg = classification_result.get('error', '분류 실패')
