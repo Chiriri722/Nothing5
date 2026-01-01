@@ -72,16 +72,19 @@ class FileClassifierApp:
         self.logger.info(f"프로젝트 루트: {PROJECT_ROOT}")
         self.logger.info("="*60)
         
-        # 설정 유효성 검사
+        # 모드 설정
+        self.gui_mode = gui_mode and HAS_GUI
+
+        # 설정 유효성 검사 (GUI 모드에서는 실패해도 실행 허용 - 설정창 띄우기 위해)
         try:
             validate_config()
             self.logger.info("설정 유효성 검사 완료")
         except ValueError as e:
-            self.logger.error(f"설정 오류: {e}")
-            raise
+            self.logger.warning(f"설정 초기화 필요: {e}")
+            if not self.gui_mode:
+                # CLI 모드에서는 설정 필수
+                raise
         
-        # 모드 설정
-        self.gui_mode = gui_mode and HAS_GUI
         self.is_running = True
         self.is_paused = False
         
@@ -107,13 +110,8 @@ class FileClassifierApp:
         self.monitor: Optional[FolderMonitor] = None
         self.gui: Optional[FileClassifierGUI] = None
         
-        # Classifier 초기화 (API 키 필요)
-        try:
-            self.classifier = FileClassifier()
-            self.logger.info("FileClassifier 초기화 완료")
-        except ValueError as e:
-            self.logger.warning(f"FileClassifier 초기화 실패: {e}")
-            self.classifier = None
+        # Classifier 초기화
+        self._init_classifier()
         
         # GUI 초기화 (GUI 모드인 경우)
         if self.gui_mode:
@@ -128,6 +126,31 @@ class FileClassifierApp:
         self._setup_signal_handlers()
         
         self.logger.info("애플리케이션 초기화 완료")
+
+    def _init_classifier(self):
+        """Classifier 초기화/재초기화"""
+        try:
+            # config 모듈에서 최신 값 다시 로드
+            import config.config as cfg
+            # 이미 로드된 모듈의 전역변수라서 import 다시 해도 갱신 안될 수 있음.
+            # 하지만 config.save_to_env가 전역변수를 업데이트 하므로,
+            # from config.config import OPENAI_API_KEY ... 로 가져온 값은 안 바뀔 수 있음.
+            # 따라서 config 모듈을 통해 접근하거나, FileClassifier 내부에서 config를 다시 읽도록 해야함.
+            # 여기서는 modules/classifier.py 가 config의 변수를 import 하므로,
+            # classifier 인스턴스를 생성할 때 명시적으로 최신 값을 전달하는 것이 좋음.
+
+            self.classifier = FileClassifier(
+                api_key=cfg.OPENAI_API_KEY,
+                base_url=cfg.OPENAI_BASE_URL,
+                model=cfg.LLM_MODEL
+            )
+            self.logger.info("FileClassifier 초기화 완료")
+        except ValueError as e:
+            self.logger.warning(f"FileClassifier 초기화 실패: {e}")
+            self.classifier = None
+        except ImportError as e:
+            self.logger.error(f"필수 패키지 누락: {e}")
+            self.classifier = None
     
     def _setup_signal_handlers(self) -> None:
         """신호 핸들러 설정 (Ctrl+C, SIGTERM)"""
@@ -152,10 +175,30 @@ class FileClassifierApp:
         self.gui.set_on_undo(self._on_undo)
         self.gui.set_on_redo(self._on_redo)
         self.gui.set_on_export_log(self._on_export_log)
+        self.gui.set_on_settings_changed(self._on_settings_changed)
         self.logger.info("GUI 콜백 설정 완료")
+
+    def _on_settings_changed(self) -> None:
+        """설정 변경 시 호출 (재초기화)"""
+        self.logger.info("설정 변경 감지. Classifier 재초기화 중...")
+        self._init_classifier()
+        if self.classifier:
+             if self.gui:
+                 self.gui.show_info_dialog("완료", "설정이 적용되고 Classifier가 재초기화되었습니다.")
+        else:
+             if self.gui:
+                 self.gui.show_warning_dialog("경고", "설정은 저장되었으나 Classifier 초기화에 실패했습니다. API Key 등을 확인하세요.")
     
     def _on_start_monitoring(self, folder: str) -> None:
         """파일 감시 시작"""
+        if not self.classifier:
+            self.logger.error("Classifier가 준비되지 않아 모니터링을 시작할 수 없습니다.")
+            if self.gui:
+                self.gui.show_error_dialog("오류", "설정이 완료되지 않았습니다. 설정 메뉴에서 API Key 등을 입력하세요.")
+                # 설정창 띄우기 유도
+                self.gui._show_settings()
+            return
+
         if not Path(folder).exists():
             error_msg = f"폴더가 존재하지 않습니다: {folder}"
             self.logger.error(error_msg)
