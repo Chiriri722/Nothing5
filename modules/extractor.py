@@ -35,7 +35,7 @@ class FileExtractor:
     - PDF
     - DOCX (Word 문서)
     - TXT (텍스트)
-    - 이미지 (PNG, JPG, etc.)
+    - 이미지 (PNG, JPG, etc. - 메타데이터)
     """
     
     def __init__(self):
@@ -65,9 +65,8 @@ class FileExtractor:
             
         Returns:
             Dict[str, Any]: 추출된 내용과 메타데이터
-                - content: 추출된 텍스트
+                - content: 추출된 텍스트 (스마트 요약 적용)
                 - metadata: 메타데이터
-                - encoding: 파일 인코딩
                 - size: 파일 크기
         """
         path = Path(file_path)
@@ -267,6 +266,8 @@ class FileExtractor:
             logger.error(f"이미지 추출 오류: {e}")
             return None
 
+        logger.warning(f"텍스트 파일 인코딩 감지 실패: {file_path}")
+        return None
 
 if __name__ == "__main__":
     extractor = FileExtractor()

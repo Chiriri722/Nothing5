@@ -6,6 +6,7 @@ LLM 기반 파일 분류 프로그램의 전역 설정값을 정의합니다.
 """
 
 import os
+import json
 from pathlib import Path
 from dotenv import load_dotenv
 
@@ -31,6 +32,60 @@ OPENAI_BASE_URL = os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1")
 LLM_MODEL = os.getenv("LLM_MODEL", "gpt-3.5-turbo")
 LLM_TEMPERATURE = 0.7
 LLM_MAX_TOKENS = 500
+
+# 자격 증명 소스 설정 (기본값: 'openai' - 환경변수)
+# options: 'openai', 'gemini', 'claude', 'manual'
+CREDENTIAL_SOURCE = "openai"
+MANUAL_API_KEY = "" # 수동 입력 시 저장될 키
+
+# 사용자 설정 파일 로드 (있다면)
+if USER_SETTINGS_FILE.exists():
+    try:
+        with open(USER_SETTINGS_FILE, 'r', encoding='utf-8') as f:
+            user_settings = json.load(f)
+            CREDENTIAL_SOURCE = user_settings.get("CREDENTIAL_SOURCE", CREDENTIAL_SOURCE)
+            MANUAL_API_KEY = user_settings.get("MANUAL_API_KEY", MANUAL_API_KEY)
+
+            # 저장된 모델이 있으면 복원 (옵션)
+            if "LLM_MODEL" in user_settings:
+                LLM_MODEL = user_settings["LLM_MODEL"]
+
+    except Exception as e:
+        print(f"Failed to load user settings: {e}")
+
+# 자격 증명 소스에 따른 API 키 및 모델 초기화
+# 모듈 로딩 시점에 실행됨. 의존성 문제를 피하기 위해 CredentialManager는 이 블록 안에서만 임포트 시도.
+try:
+    if CREDENTIAL_SOURCE in ["gemini", "claude"]:
+        # 로컬 임포트로 순환 참조 방지
+        # 주의: config.py는 프로젝트 전역에서 임포트되므로, modules 패키지가 import 가능한 상태여야 함.
+        # sys.path 설정이 완료된 상태라고 가정.
+        from modules.credential_manager import CredentialManager
+        cm = CredentialManager()
+
+        if CREDENTIAL_SOURCE == "gemini":
+            key = cm.detect_gemini_credentials()
+            if key:
+                OPENAI_API_KEY = key
+                # 모델이 기본값이면 Gemini 모델로 변경
+                if LLM_MODEL.startswith("gpt-"):
+                     LLM_MODEL = "gemini-pro"
+        elif CREDENTIAL_SOURCE == "claude":
+            key = cm.detect_claude_credentials()
+            if key:
+                OPENAI_API_KEY = key
+                if LLM_MODEL.startswith("gpt-"):
+                    LLM_MODEL = "claude-3-opus-20240229" # 또는 적절한 기본값
+
+    elif CREDENTIAL_SOURCE == "manual" and MANUAL_API_KEY:
+        OPENAI_API_KEY = MANUAL_API_KEY
+
+except ImportError:
+    # modules를 아직 찾을 수 없는 초기 단계일 수 있음 (setup.py 실행 중 등)
+    # 이 경우 무시하고 넘어감
+    pass
+except Exception as e:
+    print(f"Error loading credentials in config: {e}")
 
 # ========================
 # 파일 분류 설정

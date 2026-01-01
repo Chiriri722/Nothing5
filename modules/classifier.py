@@ -19,6 +19,19 @@ try:
 except ImportError:
     raise ImportError("openai 패키지가 설치되지 않았습니다. 'pip install openai' 실행해주세요.")
 
+# Optional providers
+try:
+    import google.generativeai as genai
+    HAS_GEMINI = True
+except ImportError:
+    HAS_GEMINI = False
+
+try:
+    import anthropic
+    HAS_CLAUDE = True
+except ImportError:
+    HAS_CLAUDE = False
+
 from config.config import (
     OPENAI_API_KEY,
     OPENAI_BASE_URL,
@@ -27,6 +40,7 @@ from config.config import (
     LLM_MAX_TOKENS,
     TIMEOUT,
 )
+import config.config as cfg
 
 logger = logging.getLogger(__name__)
 
@@ -410,7 +424,7 @@ class FileClassifier:
 
     def _call_api(self, prompt: str) -> str:
         """
-        OpenAI API를 호출합니다.
+        설정된 LLM API를 호출합니다.
 
         Args:
             prompt (str): 프롬프트
@@ -418,8 +432,18 @@ class FileClassifier:
         Returns:
             str: API 응답 텍스트
         """
-        logger.debug(f"API 호출 - 모델: {self.model}")
+        logger.debug(f"API 호출 - 모델: {self.model}, 소스: {cfg.CREDENTIAL_SOURCE}")
 
+        if cfg.CREDENTIAL_SOURCE == "gemini" and self.genai_configured:
+            return self._call_gemini(prompt)
+        elif cfg.CREDENTIAL_SOURCE == "claude" and self.claude_client:
+            return self._call_claude(prompt)
+        elif self.client:
+            return self._call_openai(prompt)
+        else:
+            raise ValueError("사용 가능한 LLM 클라이언트가 없습니다.")
+
+    def _call_openai(self, prompt: str) -> str:
         response = self.client.chat.completions.create(
             model=self.model,
             messages=[{"role": "user", "content": prompt}],
@@ -427,8 +451,43 @@ class FileClassifier:
             max_tokens=self.max_tokens,
             timeout=self.timeout,
         )
-
         return response.choices.message.content
+
+    def _call_gemini(self, prompt: str) -> str:
+        try:
+            # gemini-pro 등 모델명 매핑 또는 그대로 사용
+            model_name = self.model if "gemini" in self.model else "gemini-pro"
+            model = genai.GenerativeModel(model_name)
+
+            # Generation Config
+            generation_config = genai.types.GenerationConfig(
+                temperature=self.temperature,
+                max_output_tokens=self.max_tokens
+            )
+
+            response = model.generate_content(prompt, generation_config=generation_config)
+            return response.text
+        except Exception as e:
+            logger.error(f"Gemini API Error: {e}")
+            raise
+
+    def _call_claude(self, prompt: str) -> str:
+        try:
+            # Claude 3 모델명 확인 (claude-3-opus-20240229, claude-3-sonnet-20240229, etc)
+            model_name = self.model if "claude" in self.model else "claude-3-haiku-20240307"
+
+            message = self.claude_client.messages.create(
+                model=model_name,
+                max_tokens=self.max_tokens,
+                temperature=self.temperature,
+                messages=[
+                    {"role": "user", "content": prompt}
+                ]
+            )
+            return message.content[0].text
+        except Exception as e:
+            logger.error(f"Claude API Error: {e}")
+            raise
 
     def _call_vision_api(
         self, prompt: str, image_data: str, image_type: str
@@ -653,3 +712,56 @@ class FileClassifier:
         """
         with open(image_path, "rb") as image_file:
             return base64.b64encode(image_file.read()).decode("utf-8")
+
+    def _check_rules(self, filename: str, file_type: str) -> Optional[Dict[str, Any]]:
+        """
+        규칙 기반 분류를 수행합니다.
+
+        Args:
+            filename (str): 파일명
+            file_type (str): 파일 타입
+
+        Returns:
+            Optional[Dict[str, Any]]: 분류 결과 (매칭되는 규칙이 없으면 None)
+        """
+        # 1. 명확한 확장자 규칙
+        extension_rules = {
+            "mp3": "음악", "wav": "음악", "flac": "음악",
+            "mp4": "비디오", "avi": "비디오", "mkv": "비디오",
+            "zip": "압축파일", "rar": "압축파일", "7z": "압축파일",
+            "exe": "설치파일", "msi": "설치파일", "apk": "설치파일",
+            "py": "소스코드", "js": "소스코드", "html": "소스코드", "css": "소스코드"
+        }
+
+        lower_type = file_type.lower()
+        if lower_type in extension_rules:
+            folder_name = extension_rules[lower_type]
+            return {
+                "status": ClassificationStatus.SUCCESS.value,
+                "folder_name": folder_name,
+                "category": self.FILE_TYPE_MAPPING.get(lower_type, "기타"),
+                "confidence": 1.0,
+                "reason": f"확장자 규칙 ({lower_type})"
+            }
+
+        # 2. 키워드 규칙 (파일명에 특정 단어가 포함된 경우)
+        keyword_rules = [
+            (r"(?i)invoice|영수증|bill|receipt", "영수증"),
+            (r"(?i)contract|계약서", "계약서"),
+            (r"(?i)manual|매뉴얼|사용설명서", "매뉴얼"),
+            (r"(?i)schedule|일정표|계획표", "일정"),
+            (r"(?i)screenshot|스크린샷", "스크린샷"),
+            (r"(?i)scan|스캔", "스캔문서"),
+        ]
+
+        for pattern, folder in keyword_rules:
+            if re.search(pattern, filename):
+                return {
+                    "status": ClassificationStatus.SUCCESS.value,
+                    "folder_name": folder,
+                    "category": "문서",
+                    "confidence": 0.95,
+                    "reason": f"키워드 규칙 ({folder})"
+                }
+
+        return None
