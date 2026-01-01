@@ -9,6 +9,7 @@ LLM이 추천한 폴더로 파일을 안전하게 이동시키는 기능을 제�
 import os
 import shutil
 import logging
+import asyncio
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 from datetime import datetime
@@ -69,6 +70,13 @@ class FileMover:
         self.move_history: List[Dict] = []
         
         logger.info(f"FileMover 초기화됨 - base_path: {self.base_path}")
+
+    async def move_file_async(self, source_file_path: str, folder_name: str) -> Dict:
+        """
+        비동기적으로 파일을 이동합니다.
+        블로킹 작업을 스레드 풀에서 실행합니다.
+        """
+        return await asyncio.to_thread(self.move_file, source_file_path, folder_name)
     
     def move_file(self, source_file_path: str, folder_name: str) -> Dict:
         """

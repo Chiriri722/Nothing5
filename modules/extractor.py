@@ -6,6 +6,7 @@ PDF, DOCX, 이미지 등 다양한 파일 형식에서 텍스트와 메타데이
 """
 
 import logging
+import asyncio
 from pathlib import Path
 from typing import Dict, Any, Optional
 
@@ -55,6 +56,13 @@ class FileExtractor:
         self.image_extensions = {
             '.png', '.jpg', '.jpeg', '.gif', '.bmp', '.svg', '.webp'
         }
+
+    async def extract_async(self, file_path: str) -> Optional[Dict[str, Any]]:
+        """
+        비동기적으로 파일 내용을 추출합니다.
+        블로킹 작업을 스레드 풀에서 실행합니다.
+        """
+        return await asyncio.to_thread(self.extract, file_path)
     
     def extract(self, file_path: str) -> Optional[Dict[str, Any]]:
         """
