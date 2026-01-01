@@ -9,13 +9,14 @@ import json
 import re
 import base64
 import logging
+import asyncio
 from typing import Dict, List, Optional, Any
 from enum import Enum
 from pathlib import Path
 import os
 
 try:
-    from openai import OpenAI, APIError, APIConnectionError, RateLimitError
+    from openai import OpenAI, AsyncOpenAI, APIError, APIConnectionError, RateLimitError
 except ImportError:
     raise ImportError("openai 패키지가 설치되지 않았습니다. 'pip install openai' 실행해주세요.")
 
@@ -39,8 +40,10 @@ from config.config import (
     LLM_TEMPERATURE,
     LLM_MAX_TOKENS,
     TIMEOUT,
+    MAX_CONTENT_LENGTH,
 )
 import config.config as cfg
+from modules.history_db import ProcessingHistory
 
 logger = logging.getLogger(__name__)
 
@@ -207,8 +210,107 @@ class FileClassifier:
 
         # OpenAI 클라이언트 초기화
         self.client = OpenAI(api_key=self.api_key, base_url=self.base_url)
+        self.async_client = AsyncOpenAI(api_key=self.api_key, base_url=self.base_url)
+
+        # 히스토리 DB 및 세마포어
+        self.history_db = ProcessingHistory()
+        self.semaphore = asyncio.Semaphore(5) # 최대 5개 동시 요청
 
         logger.info(f"FileClassifier 초기화됨 - 모델: {self.model}, Base URL: {self.base_url}")
+
+    async def classify_file_async(
+        self, filename: str, file_type: str, content: str, file_path: str = None
+    ) -> Dict[str, Any]:
+        """비동기 파일 분류"""
+        # 1. 캐시 확인
+        if file_path:
+            file_hash = await self.history_db.get_file_hash_async(file_path)
+            cached_result = await self.history_db.get_result_async(file_hash)
+            if cached_result:
+                logger.info(f"캐시된 결과 사용: {filename} -> {cached_result['folder_name']}")
+                return {**cached_result, "status": ClassificationStatus.SUCCESS.value}
+
+        # 2. 규칙 기반 확인
+        rule_based_result = self.check_rules(filename, file_type)
+        if rule_based_result:
+            return rule_based_result
+
+        # 3. API 호출 (세마포어 적용)
+        async with self.semaphore:
+            result = await self._classify_file_api_async(filename, file_type, content)
+
+        # 4. 결과 저장
+        if result.get("status") == ClassificationStatus.SUCCESS.value and file_path:
+            file_size = Path(file_path).stat().st_size
+            await self.history_db.save_result_async(file_hash, filename, file_size, result)
+
+        return result
+
+    async def _classify_file_api_async(self, filename: str, file_type: str, content: str) -> Dict[str, Any]:
+        """실제 API 호출 로직 (비동기)"""
+        try:
+            # 입력 검증
+            if not filename or not file_type:
+                return self._create_fallback_result(filename, file_type, "파일명 누락")
+
+            truncated_content = content[:2500] if content else ""
+            content_length = len(content) if content else 0
+
+            prompt = self.CLASSIFICATION_PROMPT.format(
+                filename=filename,
+                file_type=file_type,
+                content_length=content_length,
+                content=truncated_content,
+            )
+
+            # 재시도 로직
+            for attempt in range(3):
+                try:
+                    response_text = await self._call_api_async(prompt)
+                    result = self._parse_response(response_text)
+
+                    folder_name = result.get("folder_name", "")
+                    validated = self._validate_folder_name(folder_name)
+                    if not validated:
+                        validated = self._create_fallback_folder_name(filename, file_type)
+
+                    result["folder_name"] = validated
+                    result["status"] = ClassificationStatus.SUCCESS.value
+                    return result
+                except RateLimitError:
+                    if attempt == 2: raise
+                    await asyncio.sleep(2 ** attempt) # Exponential Backoff
+                except Exception as e:
+                    logger.error(f"API 호출 중 오류 ({attempt+1}/3): {e}")
+                    if attempt == 2: raise
+
+        except Exception as e:
+            logger.error(f"비동기 분류 실패: {e}")
+            return self._create_fallback_result(filename, file_type, str(e))
+
+    async def _call_api_async(self, prompt: str) -> str:
+        """비동기 API 호출"""
+        if cfg.CREDENTIAL_SOURCE == "gemini" and self.genai_configured:
+             # Gemini doesn't have native async in this version maybe, verify or use thread
+             return await asyncio.to_thread(self._call_gemini, prompt)
+        elif cfg.CREDENTIAL_SOURCE == "claude" and self.claude_client:
+             # Claude native async client check
+             return await asyncio.to_thread(self._call_claude, prompt)
+        elif self.async_client:
+             response = await self.async_client.chat.completions.create(
+                model=self.model,
+                messages=[{"role": "user", "content": prompt}],
+                temperature=self.temperature,
+                max_tokens=self.max_tokens,
+                timeout=self.timeout,
+            )
+             return response.choices.message.content
+        else:
+             raise ValueError("No Async Client Available")
+
+    async def classify_image_async(self, image_path: str) -> Dict[str, Any]:
+        """비동기 이미지 분류"""
+        return await asyncio.to_thread(self.classify_image, image_path)
 
     def classify_file(
         self, filename: str, file_type: str, content: str
@@ -249,7 +351,7 @@ class FileClassifier:
 
             # 콘텐츠 길이 제한 (Smart Summary 고려하여 2500자까지 허용)
             # Extractor에서 이미 요약했더라도, 여기서 한번 더 안전장치
-            truncated_content = content[:2500] if content else ""
+            truncated_content = content[:MAX_CONTENT_LENGTH] if content else ""
             content_length = len(content) if content else 0
 
             # 프롬프트 생성

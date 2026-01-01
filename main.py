@@ -11,9 +11,11 @@ import logging
 import signal
 import argparse
 import time
+import asyncio
 from pathlib import Path
 from typing import Optional, Callable, Dict, Any
 from datetime import datetime
+import threading
 
 # 프로젝트 루트를 Python 경로에 추가
 project_root = Path(__file__).parent
@@ -99,6 +101,13 @@ class FileClassifierApp:
         
         # 모듈 초기화
         self.logger.info("모듈 초기화 중...")
+
+        # Async 초기화
+        self.loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(self.loop)
+        self.queue = asyncio.Queue()
+        self.worker_task = None
+
         self.extractor = FileExtractor()
         self.classifier: Optional[FileClassifier] = None
         self.mover = FileMover(
@@ -211,6 +220,17 @@ class FileClassifierApp:
             self.monitor.start(on_file_created=self._on_file_created)
             self.is_running = True
             self.logger.info(f"파일 감시 시작: {folder}")
+
+            # 비동기 워커 시작
+            if not self.worker_task or self.worker_task.done():
+                # run_coroutine_threadsafe returns a Future, which is fine to ignore here if we just want to fire and forget
+                # but better to keep track if possible. For now, firing is enough.
+                future = asyncio.run_coroutine_threadsafe(self._process_queue_worker(), self.loop)
+                # We can't easily assign it to self.worker_task because that expects a Task in the same loop context usually,
+                # but future is a concurrent.futures.Future.
+                # Ideally we track it. For now, let's just launch it.
+                self.worker_task = future
+
             if self.gui:
                 self.gui.update_status(f"모니터링 중: {Path(folder).name}")
         except Exception as e:
@@ -230,38 +250,64 @@ class FileClassifierApp:
             self.logger.warning("감시 중이 아닙니다.")
     
     def _on_file_created(self, file_path: str) -> None:
-        """새 파일 생성 시 콜백 (파일 처리 파이프라인)"""
+        """새 파일 생성 시 콜백 (큐에 추가)"""
         if not self.is_running or self.is_paused:
             self.logger.debug(f"파일 처리 스킵: {file_path}")
             return
         
+        # 큐에 파일 경로 추가 (Thread-Safe)
+        self.loop.call_soon_threadsafe(self.queue.put_nowait, file_path)
+        self.logger.info(f"파일 큐 추가: {file_path}")
+
+    async def _process_queue_worker(self):
+        """비동기 파일 처리 워커"""
+        logger = self.logger
+        logger.info("비동기 처리 워커 시작")
+
+        while self.is_running:
+            try:
+                # 큐에서 파일 가져오기 (타임아웃으로 중단 확인)
+                try:
+                    file_path = await asyncio.wait_for(self.queue.get(), timeout=1.0)
+                except asyncio.TimeoutError:
+                    continue
+
+                logger.info(f"파일 처리 시작 (Async): {file_path}")
+                await self._process_file_async(file_path)
+                self.queue.task_done()
+
+            except Exception as e:
+                logger.error(f"워커 오류: {e}", exc_info=True)
+                await asyncio.sleep(1) # 오류 시 잠시 대기
+
+    async def _process_file_async(self, file_path: str):
+        """단일 파일 비동기 처리 파이프라인"""
         try:
-            self.logger.info(f"파일 자동 분류 시작: {file_path}")
             file_path_obj = Path(file_path)
             
             if not file_path_obj.exists():
                 self.logger.warning(f"파일이 존재하지 않습니다: {file_path}")
                 return
             
-            # 1. 파일 내용 추출
-            extracted = self.extractor.extract(file_path)
+            # 1. 파일 내용 추출 (비동기)
+            extracted = await self.extractor.extract_async(file_path)
             content = extracted.get('content', '') if extracted else ''
             
-            # 2. 파일 분류
+            # 2. 파일 분류 (비동기)
             if not self.classifier:
                 self.logger.warning("Classifier가 초기화되지 않았습니다.")
                 return
             
             file_type = file_path_obj.suffix.lstrip('.')
 
-            # 이미지 파일인 경우 classify_image 사용 (Vision API)
             if self.classifier._is_image_file(file_type):
-                classification_result = self.classifier.classify_image(file_path)
+                classification_result = await self.classifier.classify_image_async(file_path)
             else:
-                classification_result = self.classifier.classify_file(
+                classification_result = await self.classifier.classify_file_async(
                     filename=file_path_obj.name,
                     file_type=file_type,
-                    content=content
+                    content=content,
+                    file_path=file_path
                 )
             
             if classification_result.get('status') != 'success':
@@ -270,9 +316,9 @@ class FileClassifierApp:
                 self.stats['failed'] += 1
                 return
             
-            # 3. 파일 이동
+            # 3. 파일 이동 (비동기)
             folder_name = classification_result.get('folder_name', '기타')
-            move_result = self.mover.move_file(file_path, folder_name)
+            move_result = await self.mover.move_file_async(file_path, folder_name)
             
             if move_result.get('status') == 'success':
                 self.stats['successful'] += 1
@@ -290,9 +336,9 @@ class FileClassifierApp:
                 self.stats['failed'] += 1
             
             self.stats['total_processed'] += 1
-        
+
         except Exception as e:
-            self.logger.error(f"파일 처리 중 오류: {file_path} - {e}", exc_info=True)
+            self.logger.error(f"파일 처리 중 오류 (Async): {file_path} - {e}", exc_info=True)
             self.stats['failed'] += 1
     
     def _on_undo(self) -> None:
@@ -361,6 +407,10 @@ class FileClassifierApp:
             self.logger.error("GUI 모드를 사용할 수 없습니다.")
             return
         
+        # GUI 모드에서도 백그라운드 Async Loop 실행 필요
+        t = threading.Thread(target=self.loop.run_forever, daemon=True)
+        t.start()
+
         try:
             self.logger.info("GUI 모드 시작")
             self.gui.run()
@@ -368,6 +418,8 @@ class FileClassifierApp:
             self.logger.error(f"GUI 오류: {e}", exc_info=True)
             raise
         finally:
+            self.loop.call_soon_threadsafe(self.loop.stop)
+            t.join(timeout=1.0)
             self.cleanup()
     
     def run_cli(self) -> None:
@@ -377,6 +429,9 @@ class FileClassifierApp:
         print("LLM 기반 파일 자동 분류 프로그램 (CLI 모드)")
         print("="*60 + "\n")
         
+        t = threading.Thread(target=self.loop.run_forever, daemon=True)
+        t.start()
+
         while True:
             print("\n명령어: classify (분류), monitor (감시), stats (통계), quit (종료)")
             command = input("> ").strip().lower()
@@ -392,6 +447,8 @@ class FileClassifierApp:
             else:
                 print("알 수 없는 명령어입니다.")
         
+        self.loop.call_soon_threadsafe(self.loop.stop)
+        t.join(timeout=1.0)
         self.cleanup()
     
     def _cli_classify_file(self) -> None:

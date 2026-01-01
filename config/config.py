@@ -19,6 +19,7 @@ load_dotenv()
 PROJECT_ROOT = Path(__file__).parent.parent
 LOGS_DIR = PROJECT_ROOT / "logs"
 UNDO_HISTORY_FILE = PROJECT_ROOT / "undo_history.json"
+USER_SETTINGS_FILE = PROJECT_ROOT / "user_settings.json"
 ENV_FILE = PROJECT_ROOT / ".env"
 
 # 로그 디렉토리 생성
@@ -142,6 +143,7 @@ GUI_THEME = "default"
 # 파일 처리 설정
 # ========================
 MAX_FILE_SIZE = 100 * 1024 * 1024  # 100MB
+MAX_CONTENT_LENGTH = 2500 # LLM에 보낼 최대 텍스트 길이 (토큰 절약)
 CHUNK_SIZE = 1024 * 1024  # 1MB
 
 # 파일 이동 시 충돌 처리 방식
