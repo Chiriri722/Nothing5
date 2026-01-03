@@ -41,3 +41,4 @@ wheel>=0.37.0           # 배포 형식
 # black>=22.0.0
 # flake8>=4.0.0
 # isort>=5.10.0
+tkinterdnd2>=0.3.0
