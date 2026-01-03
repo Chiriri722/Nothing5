@@ -136,49 +136,38 @@ class FileClassifier:
     FORBIDDEN_CHARS = r'[\\/:\*\?"<>|]'
 
     # 프롬프트 템플릿
-    CLASSIFICATION_PROMPT = """당신은 파일 분류 전문가입니다. 주어진 파일의 내용을 분석하고, 이를 정리하기 위한 가장 적절한 폴더 이름을 추천해주세요.
-
-파일 정보:
-- 파일명: {filename}
-- 파일 타입: {file_type}
-- 콘텐츠 길이: {content_length}
-
-파일 내용 (요약 혹은 발췌):
+    CLASSIFICATION_PROMPT = """파일을 분석하여 적절한 폴더명을 추천해주세요.
+정보: {filename}, {file_type}
+내용:
 {content}
 
-다음 규칙을 고려하여 폴더명을 추천해주세요:
-1. 한글로 된 의미있는 이름 (예: "청구서", "여행 사진", "회의록")
-2. 2-4자의 간결한 이름 선호
-3. 파일의 주요 내용을 반영
-4. 파일 확장자와 상관없이 내용 기반 분류
-5. 기존 시스템 폴더는 제외 (Documents, Desktop 등)
+규칙:
+1. 한글로 된 의미있는 이름 (예: 청구서, 회의록)
+2. 짧고 간결하게
+3. 내용 기반 분류
 
-반드시 다음 JSON 형식으로 응답해주세요:
+JSON 응답:
 {{
-    "folder_name": "추천 폴더명",
+    "folder_name": "추천폴더명",
     "category": "문서|이미지|비디오|음악|기타",
     "confidence": 0.85,
-    "reason": "폴더명을 추천한 이유"
+    "reason": "이유"
 }}"""
 
-    VISION_PROMPT = """당신은 이미지 분석 전문가입니다. 주어진 이미지를 분석하고, 이를 정리하기 위한 가장 적절한 폴더 이름을 추천해주세요.
+    VISION_PROMPT = """이미지를 분석하여 폴더명을 추천해주세요.
+정보: {filename}, {file_type}
 
-파일 정보:
-- 파일명: {filename}
-- 파일 타입: {file_type}
+규칙:
+1. 한글로 된 의미있는 이름
+2. 짧고 간결하게
+3. 내용 기반
 
-다음 규칙을 고려하여 폴더명을 추천해주세요:
-1. 한글로 된 의미있는 이름 (예: "여행 사진", "스크린샷", "영수증")
-2. 2-4자의 간결한 이름 선호
-3. 이미지의 내용과 목적을 반영
-4. 기존 시스템 폴더는 제외
-
-반드시 다음 JSON 형식으로 응답해주세요:
+JSON 응답:
 {{
-    "folder_name": "추천 폴더명",
+    "folder_name": "추천폴더명",
     "category": "이미지",
     "confidence": 0.85,
-    "reason": "폴더명을 추천한 이유"
+    "reason": "이유"
 }}"""
 
     def __init__(self, api_key: Optional[str] = None, base_url: Optional[str] = None, model: Optional[str] = None):

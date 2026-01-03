@@ -108,6 +108,7 @@ class FileExtractor:
     def extract_text_from_txt(self, file_path: str) -> Dict[str, Any]:
         """
         텍스트 파일에서 텍스트 추출 (Smart Summary: Front 1000 + Rear 1000)
+        대용량 파일의 경우 전체를 읽지 않고 앞뒤 부분만 읽습니다.
 
         Args:
             file_path (str): 텍스트 파일 경로
@@ -116,39 +117,87 @@ class FileExtractor:
             Dict[str, Any]: 추출 결과
         """
         try:
-            # 인코딩 감지 시도 (단순히 utf-8 시도 후 cp949 시도)
+            file_size = Path(file_path).stat().st_size
             encodings = ['utf-8', 'cp949', 'euc-kr', 'latin-1']
-            content = ""
-            encoding_used = ""
 
+            # 작은 파일은 기존 로직대로 전체 읽기 시도
+            if file_size <= 2500:
+                content = ""
+                encoding_used = ""
+
+                for enc in encodings:
+                    try:
+                        with open(file_path, 'r', encoding=enc) as f:
+                            content = f.read()
+                            encoding_used = enc
+                            break
+                    except UnicodeDecodeError:
+                        continue
+
+                if not encoding_used:
+                    with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                        content = f.read()
+                        encoding_used = 'utf-8-ignore'
+
+                return {
+                    "content": content,
+                    "metadata": {"original_length": len(content)},
+                    "encoding": encoding_used,
+                    "size": file_size
+                }
+
+            # 대용량 파일은 앞뒤 1000자만 읽기
+            # Seek을 사용하기 위해 바이트 모드로 열어서 디코딩
+
+            front_text = ""
+            rear_text = ""
+            encoding_used = "utf-8" # 기본 가정
+
+            # 앞부분 읽기
+            with open(file_path, 'rb') as f:
+                # 넉넉하게 읽어서 디코딩 (멀티바이트 문자 고려)
+                front_bytes = f.read(1500)
+
+                # 뒷부분 읽기
+                f.seek(0, 2) # 끝으로 이동
+                file_end_pos = f.tell()
+                seek_pos = max(0, file_end_pos - 1500)
+                f.seek(seek_pos)
+                rear_bytes = f.read()
+
+            # 디코딩 시도
             for enc in encodings:
                 try:
-                    with open(file_path, 'r', encoding=enc) as f:
-                        content = f.read()
-                        encoding_used = enc
-                        break
+                    # 인코딩 감지를 위해 엄격한 모드로 시도 (중간 잘림 방지를 위해 약간 줄여서 테스트)
+                    # 앞부분의 대부분이 정상적으로 디코딩된다면 해당 인코딩일 확률이 높음
+                    test_bytes = front_bytes[:-4] # 멀티바이트 문자 최대 길이만큼 제외하고 테스트
+                    test_bytes.decode(enc) # 실패시 UnicodeDecodeError 발생
+
+                    # 인코딩이 확인되면, 실제 변환은 errors='ignore'로 수행 (바운더리 잘림 처리)
+                    front_text = front_bytes.decode(enc, errors='ignore')
+                    rear_text = rear_bytes.decode(enc, errors='ignore')
+                    encoding_used = enc
+                    break
                 except UnicodeDecodeError:
                     continue
 
+            # 모든 인코딩 실패시 (여기까지 올 일은 거의 없지만)
             if not encoding_used:
-                # 모든 인코딩 실패 시 ignore로 읽기
-                with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
-                    content = f.read()
-                    encoding_used = 'utf-8-ignore'
+                 front_text = front_bytes.decode('utf-8', errors='ignore')
+                 rear_text = rear_bytes.decode('utf-8', errors='ignore')
+                 encoding_used = 'utf-8-ignore'
 
-            full_len = len(content)
+            # 길이 맞추기
+            front_text = front_text[:1000]
+            rear_text = rear_text[-1000:]
 
-            # Smart Summary Logic
-            if full_len <= 2000:
-                extracted_text = content
-            else:
-                extracted_text = content[:1000] + "\n\n...[중간 생략]...\n\n" + content[-1000:]
+            extracted_text = front_text + "\n\n...[중간 생략]...\n\n" + rear_text
 
             return {
                 "content": extracted_text,
-                "metadata": {"original_length": full_len},
+                "metadata": {"original_length": file_size}, # 근사치
                 "encoding": encoding_used,
-                "size": Path(file_path).stat().st_size
+                "size": file_size
             }
 
         except Exception as e:
