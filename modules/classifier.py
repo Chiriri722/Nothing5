@@ -203,15 +203,18 @@ JSON 응답:
 
         # 히스토리 DB 및 세마포어
         self.history_db = ProcessingHistory()
-        self.semaphore = asyncio.Semaphore(5) # 최대 5개 동시 요청
+        self.max_concurrent_requests = getattr(cfg, 'MAX_CONCURRENT_API_CALLS', 5)
+        self.semaphore = asyncio.Semaphore(self.max_concurrent_requests)
 
-        logger.info(f"FileClassifier 초기화됨 - 모델: {self.model}, Base URL: {self.base_url}")
+        logger.info(f"FileClassifier 초기화됨 - 모델: {self.model}, Base URL: {self.base_url}, Max Concurrent: {self.max_concurrent_requests}")
 
     async def classify_file_async(
         self, filename: str, file_type: str, content: str, file_path: str = None
     ) -> Dict[str, Any]:
         """비동기 파일 분류"""
-        # 1. 캐시 확인
+        file_hash = None
+
+        # 1. 캐시 확인 (Smart Caching)
         if file_path:
             file_hash = await self.history_db.get_file_hash_async(file_path)
             cached_result = await self.history_db.get_result_async(file_hash)
@@ -219,19 +222,22 @@ JSON 응답:
                 logger.info(f"캐시된 결과 사용: {filename} -> {cached_result['folder_name']}")
                 return {**cached_result, "status": ClassificationStatus.SUCCESS.value}
 
-        # 2. 규칙 기반 확인
+        # 2. 규칙 기반 확인 (Hierarchical Filtering)
         rule_based_result = self.check_rules(filename, file_type)
         if rule_based_result:
             return rule_based_result
 
-        # 3. API 호출 (세마포어 적용)
+        # 3. API 호출 (세마포어 적용 + Rate Limiting)
         async with self.semaphore:
             result = await self._classify_file_api_async(filename, file_type, content)
 
-        # 4. 결과 저장
-        if result.get("status") == ClassificationStatus.SUCCESS.value and file_path:
-            file_size = Path(file_path).stat().st_size
-            await self.history_db.save_result_async(file_hash, filename, file_size, result)
+        # 4. 결과 저장 (Memoization)
+        if result.get("status") == ClassificationStatus.SUCCESS.value and file_path and file_hash:
+            try:
+                file_size = Path(file_path).stat().st_size
+                await self.history_db.save_result_async(file_hash, filename, file_size, result)
+            except Exception as e:
+                logger.warning(f"DB 저장 실패: {e}")
 
         return result
 
@@ -242,17 +248,16 @@ JSON 응답:
             if not filename or not file_type:
                 return self._create_fallback_result(filename, file_type, "파일명 누락")
 
+            # 토큰 최적화를 위해 내용 길이 제한 (최대 2500자)
             truncated_content = content[:2500] if content else ""
-            content_length = len(content) if content else 0
 
             prompt = self.CLASSIFICATION_PROMPT.format(
                 filename=filename,
                 file_type=file_type,
-                content_length=content_length,
                 content=truncated_content,
             )
 
-            # 재시도 로직
+            # 재시도 로직 (Exponential Backoff 적용)
             for attempt in range(3):
                 try:
                     response_text = await self._call_api_async(prompt)
@@ -266,12 +271,30 @@ JSON 응답:
                     result["folder_name"] = validated
                     result["status"] = ClassificationStatus.SUCCESS.value
                     return result
-                except RateLimitError:
-                    if attempt == 2: raise
-                    await asyncio.sleep(2 ** attempt) # Exponential Backoff
+
+                except RateLimitError as e:
+                    # Rate Limit 오류 시 지수 백오프 대기
+                    wait_time = 2 ** attempt
+                    logger.warning(f"Rate Limit 도달. {wait_time}초 대기 후 재시도... ({attempt+1}/3)")
+                    if attempt == 2:
+                        logger.error(f"최대 재시도 횟수 초과: {e}")
+                        raise
+                    await asyncio.sleep(wait_time)
+
+                except (APIConnectionError, APIError) as e:
+                    # 연결 오류나 API 오류도 재시도 대상에 포함
+                    wait_time = 2 ** attempt
+                    logger.warning(f"API 오류 발생: {e}. {wait_time}초 대기 후 재시도... ({attempt+1}/3)")
+                    if attempt == 2:
+                        logger.error(f"최대 재시도 횟수 초과: {e}")
+                        raise
+                    await asyncio.sleep(wait_time)
+
                 except Exception as e:
-                    logger.error(f"API 호출 중 오류 ({attempt+1}/3): {e}")
-                    if attempt == 2: raise
+                    logger.error(f"예상치 못한 오류 ({attempt+1}/3): {e}", exc_info=True)
+                    if attempt == 2:
+                        raise
+                    await asyncio.sleep(1) # 일반 오류는 짧게 대기
 
         except Exception as e:
             logger.error(f"비동기 분류 실패: {e}")
