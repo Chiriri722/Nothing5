@@ -10,6 +10,15 @@ from ui.pages.settings_page import SettingsPage
 from ui.pages.env_settings_page import EnvSettingsPage
 import config.config as cfg
 
+# TkinterDnD Safe Import
+try:
+    from tkinterdnd2 import DND_FILES, TkinterDnD
+    HAS_DND = True
+except ImportError:
+    HAS_DND = False
+    # Fallback to normal Tk if DnD is not available
+    from tkinter import Tk as TkinterDnD
+
 logger = logging.getLogger(__name__)
 
 class FileClassifierGUI:

@@ -10,7 +10,7 @@ import signal
 import asyncio
 import threading
 from pathlib import Path
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 from datetime import datetime
 
 import config.config as cfg
@@ -103,7 +103,7 @@ class FileClassifierApp:
 
         # Concurrency control
         # Using a semaphore to limit concurrent file processing
-        self.concurrency_limit = 5
+        self.concurrency_limit = getattr(cfg, 'MAX_CONCURRENT_FILE_PROCESSING', 20)
         self.semaphore = asyncio.Semaphore(self.concurrency_limit)
 
         self.extractor = FileExtractor()
@@ -170,6 +170,7 @@ class FileClassifierApp:
         if not self.gui:
             return
 
+        self.gui.set_on_classify(self._on_classify_manual) # Bind manual classification
         self.gui.set_on_start_monitoring(self._on_start_monitoring)
         self.gui.set_on_stop_monitoring(self._on_stop_monitoring)
         self.gui.set_on_undo(self._on_undo)
@@ -187,6 +188,55 @@ class FileClassifierApp:
         else:
              if self.gui:
                  self.gui.show_warning_dialog("Warning", "Settings saved but Classifier failed to initialize.")
+
+    def _on_classify_manual(self, folder: str, categories: List[str]) -> None:
+        """
+        Manually trigger classification for all files in a folder.
+        This scans the folder and queues files for async processing.
+        """
+        self.logger.info(f"Manual classification requested for: {folder}")
+
+        if not self.classifier:
+            if self.gui:
+                self.gui.show_error_dialog("Error", "Classifier is not initialized. Please check settings.")
+            return
+
+        folder_path = Path(folder)
+        if not folder_path.exists():
+             if self.gui:
+                self.gui.show_error_dialog("Error", "Selected folder does not exist.")
+             return
+
+        # Start worker if not already running
+        if not self.worker_task or self.worker_task.done():
+             future = asyncio.run_coroutine_threadsafe(self._process_queue_worker(), self.loop)
+             self.worker_task = future
+
+        # Scan files
+        count = 0
+        try:
+            # Handle recursion based on config
+            if cfg.RECURSIVE_SEARCH:
+                files = [f for f in folder_path.rglob('*') if f.is_file()]
+            else:
+                files = [f for f in folder_path.glob('*') if f.is_file()]
+
+            for file_path in files:
+                # Skip hidden files or system files if needed
+                if file_path.name.startswith('.'):
+                    continue
+
+                self._on_file_created(str(file_path))
+                count += 1
+
+            if self.gui:
+                self.gui.update_status(f"Queued {count} files for classification.")
+            self.logger.info(f"Queued {count} files from {folder}")
+
+        except Exception as e:
+            self.logger.error(f"Error scanning folder: {e}")
+            if self.gui:
+                self.gui.show_error_dialog("Error", f"Failed to scan folder: {e}")
 
     def _on_start_monitoring(self, folder: str) -> None:
         """Start file monitoring"""
