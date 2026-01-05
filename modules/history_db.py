@@ -63,8 +63,8 @@ class ProcessingHistory:
         sha256_hash = hashlib.sha256()
         try:
             with open(file_path, "rb") as f:
-                # 4K 블록 단위로 읽기
-                for byte_block in iter(lambda: f.read(4096), b""):
+                # 64K 블록 단위로 읽기 (성능 최적화)
+                for byte_block in iter(lambda: f.read(65536), b""):
                     sha256_hash.update(byte_block)
             return sha256_hash.hexdigest()
         except Exception as e:

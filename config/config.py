@@ -152,8 +152,10 @@ FILE_CONFLICT_STRATEGY = "rename"
 # ========================
 # 성능 설정
 # ========================
-MAX_WORKERS = 4
-TIMEOUT = 30
+MAX_WORKERS = 4  # 동시 처리 스레드 수
+TIMEOUT = 30  # API 요청 타임아웃 (초)
+MAX_CONCURRENT_FILE_PROCESSING = 20 # 동시에 처리할 파일 수 (추출/이동)
+MAX_CONCURRENT_API_CALLS = 5 # 동시에 실행할 API 호출 수
 
 # ========================
 # 함수

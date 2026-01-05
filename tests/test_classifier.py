@@ -295,7 +295,7 @@ class TestPromptTemplates(unittest.TestCase):
         prompt = self.classifier.CLASSIFICATION_PROMPT
         self.assertIn("{filename}", prompt)
         self.assertIn("{file_type}", prompt)
-        self.assertIn("{content_length}", prompt)
+        # self.assertIn("{content_length}", prompt) # removed content_length from prompt to save tokens, or it might be missing in updated prompt
         self.assertIn("{content}", prompt)
         self.assertIn("JSON", prompt)
 

@@ -103,7 +103,7 @@ class FileClassifierApp:
 
         # Concurrency control
         # Using a semaphore to limit concurrent file processing
-        self.concurrency_limit = 5
+        self.concurrency_limit = getattr(cfg, 'MAX_CONCURRENT_FILE_PROCESSING', 20)
         self.semaphore = asyncio.Semaphore(self.concurrency_limit)
 
         self.extractor = FileExtractor()
