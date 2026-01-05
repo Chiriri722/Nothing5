@@ -16,22 +16,10 @@ from pathlib import Path
 import os
 
 try:
-    from openai import OpenAI, AsyncOpenAI, APIError, APIConnectionError, RateLimitError
+    from openai import APIError, APIConnectionError, RateLimitError
 except ImportError:
-    raise ImportError("openai 패키지가 설치되지 않았습니다. 'pip install openai' 실행해주세요.")
-
-# Optional providers
-try:
-    import google.generativeai as genai
-    HAS_GEMINI = True
-except ImportError:
-    HAS_GEMINI = False
-
-try:
-    import anthropic
-    HAS_CLAUDE = True
-except ImportError:
-    HAS_CLAUDE = False
+    # OpenAI not installed, but we might be using other providers
+    pass
 
 from config.config import (
     OPENAI_API_KEY,
@@ -44,6 +32,8 @@ from config.config import (
 )
 import config.config as cfg
 from modules.history_db import ProcessingHistory
+from modules.llm.factory import create_llm_client
+from modules.llm.openai_client import OpenAIClient
 
 logger = logging.getLogger(__name__)
 
@@ -171,22 +161,12 @@ JSON 응답:
 }}"""
 
     def __init__(self, api_key: Optional[str] = None, base_url: Optional[str] = None, model: Optional[str] = None):
-        """
-        FileClassifier 초기화
-
-        Args:
-            api_key (Optional[str]): OpenAI API 키. None이면 환경변수에서 로드
-            base_url (Optional[str]): OpenAI 호환 Base URL. None이면 환경변수에서 로드
-            model (Optional[str]): 사용할 모델명. None이면 설정값 사용
-
-        Raises:
-            ValueError: API 키가 없을 경우
-        """
+        """FileClassifier 초기화"""
         # API 키 설정
         self.api_key = api_key or OPENAI_API_KEY
         if not self.api_key:
             logger.error("OPENAI_API_KEY가 설정되지 않았습니다")
-            raise ValueError("OPENAI_API_KEY 환경 변수가 필요합니다")
+            # raise ValueError("OPENAI_API_KEY 환경 변수가 필요합니다") # Allow init for UI, check later
 
         # Base URL 설정
         self.base_url = base_url or OPENAI_BASE_URL
@@ -197,9 +177,20 @@ JSON 응답:
         self.max_tokens = LLM_MAX_TOKENS
         self.timeout = TIMEOUT
 
-        # OpenAI 클라이언트 초기화
-        self.client = OpenAI(api_key=self.api_key, base_url=self.base_url)
-        self.async_client = AsyncOpenAI(api_key=self.api_key, base_url=self.base_url)
+        # LLM Client Factory
+        try:
+            self.llm_client = create_llm_client(
+                cfg.CREDENTIAL_SOURCE,
+                self.api_key,
+                self.base_url,
+                self.model,
+                self.temperature,
+                self.max_tokens,
+                self.timeout
+            )
+        except Exception as e:
+            logger.error(f"Failed to initialize LLM Client: {e}")
+            self.llm_client = None
 
         # 히스토리 DB 및 세마포어
         self.history_db = ProcessingHistory()
@@ -260,7 +251,10 @@ JSON 응답:
             # 재시도 로직 (Exponential Backoff 적용)
             for attempt in range(3):
                 try:
-                    response_text = await self._call_api_async(prompt)
+                    if not self.llm_client:
+                        raise ValueError("LLM Client not initialized")
+
+                    response_text = await self.llm_client.call_async(prompt)
                     result = self._parse_response(response_text)
 
                     folder_name = result.get("folder_name", "")
@@ -271,54 +265,19 @@ JSON 응답:
                     result["folder_name"] = validated
                     result["status"] = ClassificationStatus.SUCCESS.value
                     return result
-
-                except RateLimitError as e:
-                    # Rate Limit 오류 시 지수 백오프 대기
-                    wait_time = 2 ** attempt
-                    logger.warning(f"Rate Limit 도달. {wait_time}초 대기 후 재시도... ({attempt+1}/3)")
-                    if attempt == 2:
-                        logger.error(f"최대 재시도 횟수 초과: {e}")
-                        raise
-                    await asyncio.sleep(wait_time)
-
-                except (APIConnectionError, APIError) as e:
-                    # 연결 오류나 API 오류도 재시도 대상에 포함
-                    wait_time = 2 ** attempt
-                    logger.warning(f"API 오류 발생: {e}. {wait_time}초 대기 후 재시도... ({attempt+1}/3)")
-                    if attempt == 2:
-                        logger.error(f"최대 재시도 횟수 초과: {e}")
-                        raise
-                    await asyncio.sleep(wait_time)
-
-                except Exception as e:
-                    logger.error(f"예상치 못한 오류 ({attempt+1}/3): {e}", exc_info=True)
-                    if attempt == 2:
-                        raise
-                    await asyncio.sleep(1) # 일반 오류는 짧게 대기
+                except Exception as e: # Catch generic exception for retry
+                    # Check for RateLimit if using OpenAI directly, but abstraction hides it slightly
+                    # For now, simple retry logic
+                    if "rate limit" in str(e).lower():
+                        if attempt == 2: raise
+                        await asyncio.sleep(2 ** attempt)
+                    else:
+                        logger.error(f"API 호출 중 오류 ({attempt+1}/3): {e}")
+                        if attempt == 2: raise
 
         except Exception as e:
             logger.error(f"비동기 분류 실패: {e}")
             return self._create_fallback_result(filename, file_type, str(e))
-
-    async def _call_api_async(self, prompt: str) -> str:
-        """비동기 API 호출"""
-        if cfg.CREDENTIAL_SOURCE == "gemini" and self.genai_configured:
-             # Gemini doesn't have native async in this version maybe, verify or use thread
-             return await asyncio.to_thread(self._call_gemini, prompt)
-        elif cfg.CREDENTIAL_SOURCE == "claude" and self.claude_client:
-             # Claude native async client check
-             return await asyncio.to_thread(self._call_claude, prompt)
-        elif self.async_client:
-             response = await self.async_client.chat.completions.create(
-                model=self.model,
-                messages=[{"role": "user", "content": prompt}],
-                temperature=self.temperature,
-                max_tokens=self.max_tokens,
-                timeout=self.timeout,
-            )
-             return response.choices.message.content
-        else:
-             raise ValueError("No Async Client Available")
 
     async def classify_image_async(self, image_path: str) -> Dict[str, Any]:
         """비동기 이미지 분류"""
@@ -327,46 +286,23 @@ JSON 응답:
     def classify_file(
         self, filename: str, file_type: str, content: str
     ) -> Dict[str, Any]:
-        """
-        파일을 분류합니다.
-
-        Args:
-            filename (str): 파일명
-            file_type (str): 파일 타입 (확장자, 예: "pdf")
-            content (str): 파일 내용
-
-        Returns:
-            Dict[str, Any]: 분류 결과
-                {
-                    "status": "success" | "error",
-                    "folder_name": "폴더명",
-                    "category": "카테고리",
-                    "confidence": 0.85,
-                    "reason": "이유",
-                    "error": "에러메시지 (실패 시만)"
-                }
-        """
+        """파일 분류 (동기)"""
         logger.info(f"파일 분류 시작: {filename}")
 
         try:
-            # 입력 검증
             if not filename or not file_type:
                 error_msg = "파일명과 파일 타입이 필요합니다"
                 logger.error(error_msg)
                 return self._create_fallback_result(filename, file_type, error_msg)
 
-            # 1. 계층적 필터링 (규칙 기반 분류)
             rule_based_result = self.check_rules(filename, file_type)
             if rule_based_result:
                 logger.info(f"규칙 기반 분류 성공: {filename} -> {rule_based_result['folder_name']}")
                 return rule_based_result
 
-            # 콘텐츠 길이 제한 (Smart Summary 고려하여 2500자까지 허용)
-            # Extractor에서 이미 요약했더라도, 여기서 한번 더 안전장치
             truncated_content = content[:MAX_CONTENT_LENGTH] if content else ""
             content_length = len(content) if content else 0
 
-            # 프롬프트 생성
             prompt = self.CLASSIFICATION_PROMPT.format(
                 filename=filename,
                 file_type=file_type,
@@ -374,67 +310,85 @@ JSON 응답:
                 content=truncated_content,
             )
 
-            logger.debug(f"프롬프트 생성 완료 - 길이: {len(prompt)}")
+            if not self.llm_client:
+                 raise ValueError("LLM Client not initialized")
 
-            # API 호출
-            response = self._call_api(prompt)
-
-            # 응답 파싱
+            response = self.llm_client.call(prompt)
             result = self._parse_response(response)
 
-            # 폴더명 검증
             folder_name = result.get("folder_name", "")
             validated_folder_name = self._validate_folder_name(folder_name)
 
             if not validated_folder_name:
-                logger.warning(
-                    f"폴더명 검증 실패: {folder_name}, 폴백 사용"
-                )
-                validated_folder_name = self._create_fallback_folder_name(
-                    filename, file_type
-                )
+                logger.warning(f"폴더명 검증 실패: {folder_name}, 폴백 사용")
+                validated_folder_name = self._create_fallback_folder_name(filename, file_type)
 
             result["folder_name"] = validated_folder_name
             result["status"] = ClassificationStatus.SUCCESS.value
 
-            logger.info(
-                f"분류 완료 - {filename} -> {validated_folder_name} "
-                f"(신뢰도: {result.get('confidence', 0):.2f})"
-            )
-
             return result
-
-        except RateLimitError as e:
-            error_msg = "API 레이트 제한 도달. 잠시 후 다시 시도해주세요."
-            logger.error(f"{error_msg}: {str(e)}")
-            return self._create_fallback_result(filename, file_type, error_msg)
-
-        except APIConnectionError as e:
-            error_msg = "OpenAI API 연결 오류"
-            logger.error(f"{error_msg}: {str(e)}")
-            return self._create_fallback_result(filename, file_type, error_msg)
-
-        except APIError as e:
-            error_msg = f"OpenAI API 오류: {str(e)}"
-            logger.error(error_msg)
-            return self._create_fallback_result(filename, file_type, error_msg)
 
         except Exception as e:
             error_msg = f"분류 중 오류 발생: {str(e)}"
             logger.error(error_msg, exc_info=True)
             return self._create_fallback_result(filename, file_type, error_msg)
 
+    def classify_image(self, image_path: str) -> Dict[str, Any]:
+        """이미지 분류"""
+        logger.info(f"이미지 분류 시작: {image_path}")
+
+        try:
+            if not Path(image_path).exists():
+                return self._create_error_result(f"파일을 찾을 수 없습니다: {image_path}")
+
+            filename = Path(image_path).name
+            file_type = Path(image_path).suffix.lstrip(".").lower()
+
+            rule_based_result = self.check_rules(filename, file_type)
+            if rule_based_result:
+                 return rule_based_result
+
+            if not self._is_image_file(file_type):
+                return self._create_fallback_result(filename, file_type, "이미지 파일이 아닙니다")
+
+            # Vision API is only supported by OpenAI client currently in this impl
+            if not isinstance(self.llm_client, OpenAIClient):
+                 # Fallback for other providers if they don't support vision in this abstraction yet
+                 return self._create_fallback_result(filename, file_type, "Vision API not supported by current provider")
+
+            image_data = self._encode_image_to_base64(image_path)
+
+            prompt = self.VISION_PROMPT.format(filename=filename, file_type=file_type)
+
+            # Determine mime type
+            mime_types = {
+                "jpg": "image/jpeg", "jpeg": "image/jpeg", "png": "image/png",
+                "gif": "image/gif", "webp": "image/webp",
+            }
+            mime_type = mime_types.get(file_type, "image/jpeg")
+
+            response = self.llm_client.call_vision(prompt, image_data, mime_type)
+            result = self._parse_response(response)
+
+            folder_name = result.get("folder_name", "")
+            validated_folder_name = self._validate_folder_name(folder_name)
+
+            if not validated_folder_name:
+                validated_folder_name = self._create_fallback_folder_name(filename, file_type)
+
+            result["folder_name"] = validated_folder_name
+            result["status"] = ClassificationStatus.SUCCESS.value
+
+            return result
+
+        except Exception as e:
+            error_msg = f"이미지 분류 중 오류: {str(e)}"
+            logger.error(error_msg, exc_info=True)
+            filename = Path(image_path).name if image_path else "unknown"
+            return self._create_fallback_result(filename, "image", error_msg)
+
     def check_rules(self, filename: str, file_type: str) -> Optional[Dict[str, Any]]:
-        """
-        규칙 기반 분류 (Hierarchical Filtering)
-
-        Args:
-            filename (str): 파일명
-            file_type (str): 파일 확장자 (점 제외)
-
-        Returns:
-            Optional[Dict[str, Any]]: 분류 결과가 있으면 반환, 없으면 None
-        """
+        """규칙 기반 분류 (Hierarchical Filtering)"""
         file_type_lower = file_type.lower()
         filename_lower = filename.lower()
 
@@ -462,303 +416,37 @@ JSON 응답:
 
         return None
 
-    def classify_image(self, image_path: str) -> Dict[str, Any]:
-        """
-        이미지를 Vision API를 사용하여 분류합니다.
-
-        Args:
-            image_path (str): 이미지 파일 경로
-
-        Returns:
-            Dict[str, Any]: 분류 결과
-        """
-        logger.info(f"이미지 분류 시작: {image_path}")
-
-        try:
-            # 파일 존재 확인
-            if not Path(image_path).exists():
-                error_msg = f"파일을 찾을 수 없습니다: {image_path}"
-                logger.error(error_msg)
-                return self._create_error_result(error_msg)
-
-            filename = Path(image_path).name
-            file_type = Path(image_path).suffix.lstrip(".").lower()
-
-            # 1. 계층적 필터링 (규칙 기반 분류)
-            rule_based_result = self.check_rules(filename, file_type)
-            if rule_based_result:
-                 logger.info(f"규칙 기반 이미지 분류 성공: {filename} -> {rule_based_result['folder_name']}")
-                 return rule_based_result
-
-            # 이미지 파일 확인
-            if not self._is_image_file(file_type):
-                error_msg = f"이미지 파일이 아닙니다: {filename}"
-                logger.error(error_msg)
-                return self._create_fallback_result(filename, file_type, error_msg)
-
-            # 이미지를 Base64로 인코딩
-            image_data = self._encode_image_to_base64(image_path)
-
-            # 프롬프트 생성
-            prompt = self.VISION_PROMPT.format(
-                filename=filename,
-                file_type=file_type,
-            )
-
-            # Vision API 호출
-            response = self._call_vision_api(prompt, image_data, file_type)
-
-            # 응답 파싱
-            result = self._parse_response(response)
-
-            # 폴더명 검증
-            folder_name = result.get("folder_name", "")
-            validated_folder_name = self._validate_folder_name(folder_name)
-
-            if not validated_folder_name:
-                validated_folder_name = self._create_fallback_folder_name(
-                    filename, file_type
-                )
-
-            result["folder_name"] = validated_folder_name
-            result["status"] = ClassificationStatus.SUCCESS.value
-
-            logger.info(
-                f"이미지 분류 완료 - {filename} -> {validated_folder_name}"
-            )
-
-            return result
-
-        except Exception as e:
-            error_msg = f"이미지 분류 중 오류: {str(e)}"
-            logger.error(error_msg, exc_info=True)
-            filename = Path(image_path).name if image_path else "unknown"
-            file_type = "image"
-            return self._create_fallback_result(filename, file_type, error_msg)
-
-    def _call_api(self, prompt: str) -> str:
-        """
-        설정된 LLM API를 호출합니다.
-
-        Args:
-            prompt (str): 프롬프트
-
-        Returns:
-            str: API 응답 텍스트
-        """
-        logger.debug(f"API 호출 - 모델: {self.model}, 소스: {cfg.CREDENTIAL_SOURCE}")
-
-        if cfg.CREDENTIAL_SOURCE == "gemini" and self.genai_configured:
-            return self._call_gemini(prompt)
-        elif cfg.CREDENTIAL_SOURCE == "claude" and self.claude_client:
-            return self._call_claude(prompt)
-        elif self.client:
-            return self._call_openai(prompt)
-        else:
-            raise ValueError("사용 가능한 LLM 클라이언트가 없습니다.")
-
-    def _call_openai(self, prompt: str) -> str:
-        response = self.client.chat.completions.create(
-            model=self.model,
-            messages=[{"role": "user", "content": prompt}],
-            temperature=self.temperature,
-            max_tokens=self.max_tokens,
-            timeout=self.timeout,
-        )
-        return response.choices.message.content
-
-    def _call_gemini(self, prompt: str) -> str:
-        try:
-            # gemini-pro 등 모델명 매핑 또는 그대로 사용
-            model_name = self.model if "gemini" in self.model else "gemini-pro"
-            model = genai.GenerativeModel(model_name)
-
-            # Generation Config
-            generation_config = genai.types.GenerationConfig(
-                temperature=self.temperature,
-                max_output_tokens=self.max_tokens
-            )
-
-            response = model.generate_content(prompt, generation_config=generation_config)
-            return response.text
-        except Exception as e:
-            logger.error(f"Gemini API Error: {e}")
-            raise
-
-    def _call_claude(self, prompt: str) -> str:
-        try:
-            # Claude 3 모델명 확인 (claude-3-opus-20240229, claude-3-sonnet-20240229, etc)
-            model_name = self.model if "claude" in self.model else "claude-3-haiku-20240307"
-
-            message = self.claude_client.messages.create(
-                model=model_name,
-                max_tokens=self.max_tokens,
-                temperature=self.temperature,
-                messages=[
-                    {"role": "user", "content": prompt}
-                ]
-            )
-            return message.content[0].text
-        except Exception as e:
-            logger.error(f"Claude API Error: {e}")
-            raise
-
-    def _call_vision_api(
-        self, prompt: str, image_data: str, image_type: str
-    ) -> str:
-        """
-        OpenAI Vision API를 호출합니다.
-
-        Args:
-            prompt (str): 프롬프트
-            image_data (str): Base64 인코딩된 이미지
-            image_type (str): 이미지 타입 (확장자)
-
-        Returns:
-            str: API 응답 텍스트
-        """
-        logger.debug(f"Vision API 호출 - 이미지 타입: {image_type}")
-
-        # MIME 타입 결정
-        mime_types = {
-            "jpg": "image/jpeg",
-            "jpeg": "image/jpeg",
-            "png": "image/png",
-            "gif": "image/gif",
-            "webp": "image/webp",
-        }
-        mime_type = mime_types.get(image_type, "image/jpeg")
-
-        response = self.client.chat.completions.create(
-            model=self.model,
-            messages=[
-                {
-                    "role": "user",
-                    "content": [
-                        {"type": "text", "text": prompt},
-                        {
-                            "type": "image_url",
-                            "image_url": {
-                                "url": f"data:{mime_type};base64,{image_data}"
-                            },
-                        },
-                    ],
-                }
-            ],
-            temperature=self.temperature,
-            max_tokens=self.max_tokens,
-            timeout=self.timeout,
-        )
-
-        return response.choices.message.content
-
     def _parse_response(self, response_text: str) -> Dict[str, Any]:
-        """
-        LLM 응답을 JSON으로 파싱합니다.
-
-        Args:
-            response_text (str): LLM 응답 텍스트
-
-        Returns:
-            Dict[str, Any]: 파싱된 JSON
-
-        Raises:
-            ValueError: 파싱 실패 시
-        """
         try:
-            # 마크다운 코드블록 제거
             cleaned = re.sub(r"```(?:json)?\n?", "", response_text)
             cleaned = cleaned.strip()
-
-            # JSON 파싱
             result = json.loads(cleaned)
 
-            # 필수 필드 검증
             required_fields = ["folder_name", "category", "confidence", "reason"]
             for field in required_fields:
                 if field not in result:
-                    logger.warning(f"필수 필드 누락: {field}")
-                    if field == "confidence":
-                        result[field] = 0.5
-                    else:
-                        result[field] = ""
-
+                    if field == "confidence": result[field] = 0.5
+                    else: result[field] = ""
             return result
-
         except json.JSONDecodeError as e:
             logger.error(f"JSON 파싱 실패: {str(e)}")
-            logger.debug(f"응답 텍스트: {response_text}")
             raise ValueError(f"JSON 파싱 실패: {str(e)}")
 
     def _validate_folder_name(self, folder_name: str) -> Optional[str]:
-        """
-        폴더명의 유효성을 검사합니다.
-
-        Args:
-            folder_name (str): 검사할 폴더명
-
-        Returns:
-            Optional[str]: 검증된 폴더명 (유효하지 않으면 None)
-        """
-        if not folder_name:
-            return None
-
-        # 금지된 문자 제거
-        cleaned = re.sub(self.FORBIDDEN_CHARS, "", folder_name)
-
-        # 공백 제거
-        cleaned = cleaned.strip()
-
-        # 길이 확인
-        if len(cleaned) < 2 or len(cleaned) > 30:
-            logger.warning(
-                f"폴더명 길이 부적절: {len(cleaned)} (2-30 범위)"
-            )
-            return None
-
-        # 시스템 예약어 확인
-        if cleaned.lower() in self.FORBIDDEN_FOLDER_NAMES:
-            logger.warning(f"시스템 예약어: {cleaned}")
-            return None
-
+        if not folder_name: return None
+        cleaned = re.sub(self.FORBIDDEN_CHARS, "", folder_name).strip()
+        if len(cleaned) < 2 or len(cleaned) > 30: return None
+        if cleaned.lower() in self.FORBIDDEN_FOLDER_NAMES: return None
         return cleaned
 
     def _create_fallback_folder_name(self, filename: str, file_type: str) -> str:
-        """
-        API 오류 시 폴백 폴더명을 생성합니다.
-
-        Args:
-            filename (str): 파일명
-            file_type (str): 파일 타입
-
-        Returns:
-            str: 생성된 폴더명
-        """
-        logger.debug(f"폴백 폴더명 생성 - 파일: {filename}, 타입: {file_type}")
-
-        # 파일 타입으로 기본 분류
         category = self.FILE_TYPE_MAPPING.get(file_type.lower(), "기타")
-
-        # 파일명에서 의미있는 부분 추출
         name_without_ext = Path(filename).stem
-        cleaned_name = re.sub(self.FORBIDDEN_CHARS, "", name_without_ext)
-        cleaned_name = cleaned_name.strip()[:20]
-
-        if cleaned_name and len(cleaned_name) >= 2:
-            return cleaned_name
-
+        cleaned_name = re.sub(self.FORBIDDEN_CHARS, "", name_without_ext).strip()[:20]
+        if cleaned_name and len(cleaned_name) >= 2: return cleaned_name
         return category
 
     def _create_error_result(self, error_msg: str) -> Dict[str, Any]:
-        """
-        에러 결과를 생성합니다.
-
-        Args:
-            error_msg (str): 에러 메시지
-
-        Returns:
-            Dict[str, Any]: 에러 결과
-        """
         return {
             "status": ClassificationStatus.ERROR.value,
             "folder_name": "기타",
@@ -768,23 +456,9 @@ JSON 응답:
             "error": error_msg,
         }
 
-    def _create_fallback_result(
-        self, filename: str, file_type: str, error_msg: str
-    ) -> Dict[str, Any]:
-        """
-        폴백 분류 결과를 생성합니다.
-
-        Args:
-            filename (str): 파일명
-            file_type (str): 파일 타입
-            error_msg (str): 에러 메시지
-
-        Returns:
-            Dict[str, Any]: 폴백 분류 결과
-        """
+    def _create_fallback_result(self, filename: str, file_type: str, error_msg: str) -> Dict[str, Any]:
         folder_name = self._create_fallback_folder_name(filename, file_type)
         category = self.FILE_TYPE_MAPPING.get(file_type.lower(), "기타")
-
         return {
             "status": ClassificationStatus.SUCCESS.value,
             "folder_name": folder_name,
@@ -794,88 +468,8 @@ JSON 응답:
         }
 
     def _is_image_file(self, file_type: str) -> bool:
-        """
-        이미지 파일인지 확인합니다.
-
-        Args:
-            file_type (str): 파일 타입 (확장자)
-
-        Returns:
-            bool: 이미지 파일 여부
-        """
-        image_types = {
-            "jpg",
-            "jpeg",
-            "png",
-            "gif",
-            "bmp",
-            "svg",
-            "webp",
-        }
-        return file_type.lower() in image_types
+        return file_type.lower() in {"jpg", "jpeg", "png", "gif", "bmp", "svg", "webp"}
 
     def _encode_image_to_base64(self, image_path: str) -> str:
-        """
-        이미지 파일을 Base64로 인코딩합니다.
-
-        Args:
-            image_path (str): 이미지 파일 경로
-
-        Returns:
-            str: Base64 인코딩된 이미지
-        """
         with open(image_path, "rb") as image_file:
             return base64.b64encode(image_file.read()).decode("utf-8")
-
-    def _check_rules(self, filename: str, file_type: str) -> Optional[Dict[str, Any]]:
-        """
-        규칙 기반 분류를 수행합니다.
-
-        Args:
-            filename (str): 파일명
-            file_type (str): 파일 타입
-
-        Returns:
-            Optional[Dict[str, Any]]: 분류 결과 (매칭되는 규칙이 없으면 None)
-        """
-        # 1. 명확한 확장자 규칙
-        extension_rules = {
-            "mp3": "음악", "wav": "음악", "flac": "음악",
-            "mp4": "비디오", "avi": "비디오", "mkv": "비디오",
-            "zip": "압축파일", "rar": "압축파일", "7z": "압축파일",
-            "exe": "설치파일", "msi": "설치파일", "apk": "설치파일",
-            "py": "소스코드", "js": "소스코드", "html": "소스코드", "css": "소스코드"
-        }
-
-        lower_type = file_type.lower()
-        if lower_type in extension_rules:
-            folder_name = extension_rules[lower_type]
-            return {
-                "status": ClassificationStatus.SUCCESS.value,
-                "folder_name": folder_name,
-                "category": self.FILE_TYPE_MAPPING.get(lower_type, "기타"),
-                "confidence": 1.0,
-                "reason": f"확장자 규칙 ({lower_type})"
-            }
-
-        # 2. 키워드 규칙 (파일명에 특정 단어가 포함된 경우)
-        keyword_rules = [
-            (r"(?i)invoice|영수증|bill|receipt", "영수증"),
-            (r"(?i)contract|계약서", "계약서"),
-            (r"(?i)manual|매뉴얼|사용설명서", "매뉴얼"),
-            (r"(?i)schedule|일정표|계획표", "일정"),
-            (r"(?i)screenshot|스크린샷", "스크린샷"),
-            (r"(?i)scan|스캔", "스캔문서"),
-        ]
-
-        for pattern, folder in keyword_rules:
-            if re.search(pattern, filename):
-                return {
-                    "status": ClassificationStatus.SUCCESS.value,
-                    "folder_name": folder,
-                    "category": "문서",
-                    "confidence": 0.95,
-                    "reason": f"키워드 규칙 ({folder})"
-                }
-
-        return None
