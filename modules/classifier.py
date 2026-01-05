@@ -34,6 +34,8 @@ import config.config as cfg
 from modules.history_db import ProcessingHistory
 from modules.llm.factory import create_llm_client
 from modules.llm.openai_client import OpenAIClient
+from modules.prompts import CLASSIFICATION_PROMPT, VISION_PROMPT
+from modules.file_rules import FILE_TYPE_MAPPING, EXTENSION_RULES, KEYWORD_RULES
 
 logger = logging.getLogger(__name__)
 
@@ -50,61 +52,6 @@ class FileClassifier:
 
     파일의 내용을 분석하고 LLM이 추천하는 폴더 이름을 생성합니다.
     """
-
-    # 파일 타입별 카테고리 매핑
-    FILE_TYPE_MAPPING = {
-        # 문서
-        "txt": "문서",
-        "pdf": "문서",
-        "docx": "문서",
-        "doc": "문서",
-        "xlsx": "스프레드시트",
-        "xls": "스프레드시트",
-        "csv": "데이터",
-        # 이미지
-        "jpg": "이미지",
-        "jpeg": "이미지",
-        "png": "이미지",
-        "gif": "이미지",
-        "bmp": "이미지",
-        "svg": "이미지",
-        "webp": "이미지",
-        # 비디오
-        "mp4": "비디오",
-        "avi": "비디오",
-        "mov": "비디오",
-        "mkv": "비디오",
-        "flv": "비디오",
-        # 음악
-        "mp3": "음악",
-        "wav": "음악",
-        "flac": "음악",
-        "aac": "음악",
-        "m4a": "음악",
-        # 압축
-        "zip": "압축파일",
-        "rar": "압축파일",
-        "7z": "압축파일",
-        "tar": "압축파일",
-        "gz": "압축파일",
-    }
-
-    # 계층적 필터링을 위한 규칙 정의 (확장자 -> 폴더명)
-    EXTENSION_RULES = {
-        "jpg": "이미지", "jpeg": "이미지", "png": "이미지", "gif": "이미지",
-        "bmp": "이미지", "svg": "이미지", "webp": "이미지",
-        "mp3": "오디오", "wav": "오디오", "flac": "오디오", "aac": "오디오", "m4a": "오디오",
-        "mp4": "비디오", "avi": "비디오", "mov": "비디오", "mkv": "비디오", "flv": "비디오",
-        "zip": "압축파일", "rar": "압축파일", "7z": "압축파일", "tar": "압축파일", "gz": "압축파일",
-        "py": "코드", "js": "코드", "java": "코드", "cpp": "코드", "c": "코드", "html": "코드", "css": "코드"
-    }
-
-    # 키워드 규칙 (키워드 -> 폴더명)
-    KEYWORD_RULES = {
-        "invoice": "청구서", "receipt": "영수증", "report": "보고서",
-        "bill": "청구서", "contract": "계약서", "manual": "매뉴얼",
-        "screenshot": "스크린샷"
-    }
 
     # 금지된 폴더명 (시스템 예약어)
     FORBIDDEN_FOLDER_NAMES = {
@@ -124,41 +71,6 @@ class FileClassifier:
 
     # 금지된 문자
     FORBIDDEN_CHARS = r'[\\/:\*\?"<>|]'
-
-    # 프롬프트 템플릿
-    CLASSIFICATION_PROMPT = """파일을 분석하여 적절한 폴더명을 추천해주세요.
-정보: {filename}, {file_type}
-내용:
-{content}
-
-규칙:
-1. 한글로 된 의미있는 이름 (예: 청구서, 회의록)
-2. 짧고 간결하게
-3. 내용 기반 분류
-
-JSON 응답:
-{{
-    "folder_name": "추천폴더명",
-    "category": "문서|이미지|비디오|음악|기타",
-    "confidence": 0.85,
-    "reason": "이유"
-}}"""
-
-    VISION_PROMPT = """이미지를 분석하여 폴더명을 추천해주세요.
-정보: {filename}, {file_type}
-
-규칙:
-1. 한글로 된 의미있는 이름
-2. 짧고 간결하게
-3. 내용 기반
-
-JSON 응답:
-{{
-    "folder_name": "추천폴더명",
-    "category": "이미지",
-    "confidence": 0.85,
-    "reason": "이유"
-}}"""
 
     def __init__(self, api_key: Optional[str] = None, base_url: Optional[str] = None, model: Optional[str] = None):
         """FileClassifier 초기화"""
@@ -242,7 +154,7 @@ JSON 응답:
             # 토큰 최적화를 위해 내용 길이 제한 (최대 2500자)
             truncated_content = content[:2500] if content else ""
 
-            prompt = self.CLASSIFICATION_PROMPT.format(
+            prompt = CLASSIFICATION_PROMPT.format(
                 filename=filename,
                 file_type=file_type,
                 content=truncated_content,
@@ -303,7 +215,7 @@ JSON 응답:
             truncated_content = content[:MAX_CONTENT_LENGTH] if content else ""
             content_length = len(content) if content else 0
 
-            prompt = self.CLASSIFICATION_PROMPT.format(
+            prompt = CLASSIFICATION_PROMPT.format(
                 filename=filename,
                 file_type=file_type,
                 content_length=content_length,
@@ -358,7 +270,7 @@ JSON 응답:
 
             image_data = self._encode_image_to_base64(image_path)
 
-            prompt = self.VISION_PROMPT.format(filename=filename, file_type=file_type)
+            prompt = VISION_PROMPT.format(filename=filename, file_type=file_type)
 
             # Determine mime type
             mime_types = {
@@ -393,23 +305,23 @@ JSON 응답:
         filename_lower = filename.lower()
 
         # 1. 키워드 기반 규칙
-        for keyword, folder in self.KEYWORD_RULES.items():
+        for keyword, folder in KEYWORD_RULES.items():
             if keyword in filename_lower:
                 return {
                     "status": ClassificationStatus.SUCCESS.value,
                     "folder_name": folder,
-                    "category": self.FILE_TYPE_MAPPING.get(file_type_lower, "기타"),
+                    "category": FILE_TYPE_MAPPING.get(file_type_lower, "기타"),
                     "confidence": 1.0,
                     "reason": f"파일명 키워드 매칭 ('{keyword}')"
                 }
 
         # 2. 확장자 기반 규칙
-        if file_type_lower in self.EXTENSION_RULES:
-            folder_name = self.EXTENSION_RULES[file_type_lower]
+        if file_type_lower in EXTENSION_RULES:
+            folder_name = EXTENSION_RULES[file_type_lower]
             return {
                 "status": ClassificationStatus.SUCCESS.value,
                 "folder_name": folder_name,
-                "category": self.FILE_TYPE_MAPPING.get(file_type_lower, "기타"),
+                "category": FILE_TYPE_MAPPING.get(file_type_lower, "기타"),
                 "confidence": 0.95,
                 "reason": f"확장자 기반 규칙 ('{file_type}')"
             }
@@ -440,7 +352,7 @@ JSON 응답:
         return cleaned
 
     def _create_fallback_folder_name(self, filename: str, file_type: str) -> str:
-        category = self.FILE_TYPE_MAPPING.get(file_type.lower(), "기타")
+        category = FILE_TYPE_MAPPING.get(file_type.lower(), "기타")
         name_without_ext = Path(filename).stem
         cleaned_name = re.sub(self.FORBIDDEN_CHARS, "", name_without_ext).strip()[:20]
         if cleaned_name and len(cleaned_name) >= 2: return cleaned_name
@@ -458,7 +370,7 @@ JSON 응답:
 
     def _create_fallback_result(self, filename: str, file_type: str, error_msg: str) -> Dict[str, Any]:
         folder_name = self._create_fallback_folder_name(filename, file_type)
-        category = self.FILE_TYPE_MAPPING.get(file_type.lower(), "기타")
+        category = FILE_TYPE_MAPPING.get(file_type.lower(), "기타")
         return {
             "status": ClassificationStatus.SUCCESS.value,
             "folder_name": folder_name,
