@@ -120,24 +120,26 @@ class FileExtractor:
             file_size = Path(file_path).stat().st_size
             encodings = ['utf-8', 'cp949', 'euc-kr', 'latin-1']
 
-            # 작은 파일은 기존 로직대로 전체 읽기 시도
+            content = ""
+            encoding_used = ""
+
+            # 작은 파일은 한번에 읽기 (최적화: 파일을 한번만 읽고 메모리에서 디코딩 시도)
             if file_size <= 2500:
-                content = ""
-                encoding_used = ""
+                raw_data = b""
+                with open(file_path, 'rb') as f:
+                    raw_data = f.read()
 
                 for enc in encodings:
                     try:
-                        with open(file_path, 'r', encoding=enc) as f:
-                            content = f.read()
-                            encoding_used = enc
-                            break
+                        content = raw_data.decode(enc)
+                        encoding_used = enc
+                        break
                     except UnicodeDecodeError:
                         continue
 
                 if not encoding_used:
-                    with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
-                        content = f.read()
-                        encoding_used = 'utf-8-ignore'
+                    content = raw_data.decode('utf-8', errors='ignore')
+                    encoding_used = 'utf-8-ignore'
 
                 return {
                     "content": content,
@@ -265,8 +267,9 @@ class FileExtractor:
             doc = docx.Document(file_path)
             full_text = []
 
-            # 본문 텍스트 추출
-            for para in doc.paragraphs:
+            # 본문 텍스트 추출 (최대 100문단까지만 읽어서 최적화)
+            for i, para in enumerate(doc.paragraphs):
+                if i >= 100: break
                 full_text.append(para.text)
 
             text = '\n'.join(full_text)
@@ -322,9 +325,6 @@ class FileExtractor:
         except Exception as e:
             logger.error(f"이미지 추출 오류: {e}")
             return None
-
-        logger.warning(f"텍스트 파일 인코딩 감지 실패: {file_path}")
-        return None
 
 if __name__ == "__main__":
     extractor = FileExtractor()

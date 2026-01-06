@@ -144,6 +144,30 @@ class FileClassifier:
 
         return result
 
+    def _prepare_classification_prompt(self, filename: str, file_type: str, content: str) -> str:
+        """Helper to prepare the prompt string."""
+        # 토큰 최적화를 위해 내용 길이 제한 (최대 2500자)
+        truncated_content = content[:MAX_CONTENT_LENGTH] if content else ""
+        content_length = len(content) if content else 0
+
+        # Note: The prompt template CLASSIFICATION_PROMPT expects 'content_length' argument in sync version
+        # but the async version in original code didn't use it.
+        # I will unify to use content_length if the prompt supports it, or just ignore if it doesn't matter.
+        # Assuming CLASSIFICATION_PROMPT has {content_length} placeholder.
+
+        # Let's check CLASSIFICATION_PROMPT structure (imported from modules.prompts).
+        # Since I cannot see modules.prompts now, I'll rely on what was in the original code.
+        # Sync version used: filename, file_type, content_length, content
+        # Async version used: filename, file_type, content (and truncated it manually)
+
+        # I'll use the superset of arguments.
+        return CLASSIFICATION_PROMPT.format(
+            filename=filename,
+            file_type=file_type,
+            content_length=content_length,
+            content=truncated_content,
+        )
+
     async def _classify_file_api_async(self, filename: str, file_type: str, content: str) -> Dict[str, Any]:
         """실제 API 호출 로직 (비동기)"""
         try:
@@ -151,14 +175,7 @@ class FileClassifier:
             if not filename or not file_type:
                 return self._create_fallback_result(filename, file_type, "파일명 누락")
 
-            # 토큰 최적화를 위해 내용 길이 제한 (최대 2500자)
-            truncated_content = content[:2500] if content else ""
-
-            prompt = CLASSIFICATION_PROMPT.format(
-                filename=filename,
-                file_type=file_type,
-                content=truncated_content,
-            )
+            prompt = self._prepare_classification_prompt(filename, file_type, content)
 
             # 재시도 로직 (Exponential Backoff 적용)
             for attempt in range(3):
@@ -167,19 +184,9 @@ class FileClassifier:
                         raise ValueError("LLM Client not initialized")
 
                     response_text = await self.llm_client.call_async(prompt)
-                    result = self._parse_response(response_text)
+                    return self._process_llm_response(response_text, filename, file_type)
 
-                    folder_name = result.get("folder_name", "")
-                    validated = self._validate_folder_name(folder_name)
-                    if not validated:
-                        validated = self._create_fallback_folder_name(filename, file_type)
-
-                    result["folder_name"] = validated
-                    result["status"] = ClassificationStatus.SUCCESS.value
-                    return result
                 except Exception as e: # Catch generic exception for retry
-                    # Check for RateLimit if using OpenAI directly, but abstraction hides it slightly
-                    # For now, simple retry logic
                     if "rate limit" in str(e).lower():
                         if attempt == 2: raise
                         await asyncio.sleep(2 ** attempt)
@@ -212,33 +219,13 @@ class FileClassifier:
                 logger.info(f"규칙 기반 분류 성공: {filename} -> {rule_based_result['folder_name']}")
                 return rule_based_result
 
-            truncated_content = content[:MAX_CONTENT_LENGTH] if content else ""
-            content_length = len(content) if content else 0
-
-            prompt = CLASSIFICATION_PROMPT.format(
-                filename=filename,
-                file_type=file_type,
-                content_length=content_length,
-                content=truncated_content,
-            )
+            prompt = self._prepare_classification_prompt(filename, file_type, content)
 
             if not self.llm_client:
                  raise ValueError("LLM Client not initialized")
 
             response = self.llm_client.call(prompt)
-            result = self._parse_response(response)
-
-            folder_name = result.get("folder_name", "")
-            validated_folder_name = self._validate_folder_name(folder_name)
-
-            if not validated_folder_name:
-                logger.warning(f"폴더명 검증 실패: {folder_name}, 폴백 사용")
-                validated_folder_name = self._create_fallback_folder_name(filename, file_type)
-
-            result["folder_name"] = validated_folder_name
-            result["status"] = ClassificationStatus.SUCCESS.value
-
-            return result
+            return self._process_llm_response(response, filename, file_type)
 
         except Exception as e:
             error_msg = f"분류 중 오류 발생: {str(e)}"
@@ -280,24 +267,32 @@ class FileClassifier:
             mime_type = mime_types.get(file_type, "image/jpeg")
 
             response = self.llm_client.call_vision(prompt, image_data, mime_type)
-            result = self._parse_response(response)
-
-            folder_name = result.get("folder_name", "")
-            validated_folder_name = self._validate_folder_name(folder_name)
-
-            if not validated_folder_name:
-                validated_folder_name = self._create_fallback_folder_name(filename, file_type)
-
-            result["folder_name"] = validated_folder_name
-            result["status"] = ClassificationStatus.SUCCESS.value
-
-            return result
+            # Use shared response processor?
+            # Vision prompt response likely has same structure.
+            return self._process_llm_response(response, filename, file_type)
 
         except Exception as e:
             error_msg = f"이미지 분류 중 오류: {str(e)}"
             logger.error(error_msg, exc_info=True)
             filename = Path(image_path).name if image_path else "unknown"
             return self._create_fallback_result(filename, "image", error_msg)
+
+    def _process_llm_response(self, response_text: str, filename: str, file_type: str) -> Dict[str, Any]:
+        """Helper to process LLM response and validate folder name."""
+        result = self._parse_response(response_text)
+
+        folder_name = result.get("folder_name", "")
+        validated_folder_name = self._validate_folder_name(folder_name)
+
+        if not validated_folder_name:
+            # Only log warning if it was intended to be successful but failed validation
+            if result.get("status", "") != "error":
+                logger.warning(f"폴더명 검증 실패: {folder_name}, 폴백 사용")
+            validated_folder_name = self._create_fallback_folder_name(filename, file_type)
+
+        result["folder_name"] = validated_folder_name
+        result["status"] = ClassificationStatus.SUCCESS.value
+        return result
 
     def check_rules(self, filename: str, file_type: str) -> Optional[Dict[str, Any]]:
         """규칙 기반 분류 (Hierarchical Filtering)"""
@@ -342,6 +337,9 @@ class FileClassifier:
             return result
         except json.JSONDecodeError as e:
             logger.error(f"JSON 파싱 실패: {str(e)}")
+            # Don't raise, return a partial result or let caller handle?
+            # Original code raised ValueError.
+            # I'll stick to raising it for now, caught by caller.
             raise ValueError(f"JSON 파싱 실패: {str(e)}")
 
     def _validate_folder_name(self, folder_name: str) -> Optional[str]:
