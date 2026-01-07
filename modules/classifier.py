@@ -203,17 +203,27 @@ class FileClassifier:
         return await asyncio.to_thread(self.classify_image, image_path)
 
     def classify_file(
-        self, filename: str, file_type: str, content: str
+        self, filename: str, file_type: str, content: str, file_path: str = None
     ) -> Dict[str, Any]:
         """파일 분류 (동기)"""
         logger.info(f"파일 분류 시작: {filename}")
 
         try:
+            file_hash = None
+            # 1. 캐시 확인 (Smart Caching)
+            if file_path:
+                file_hash = self.history_db.get_file_hash(file_path)
+                cached_result = self.history_db.get_result(file_hash)
+                if cached_result:
+                    logger.info(f"캐시된 결과 사용: {filename} -> {cached_result['folder_name']}")
+                    return {**cached_result, "status": ClassificationStatus.SUCCESS.value}
+
             if not filename or not file_type:
                 error_msg = "파일명과 파일 타입이 필요합니다"
                 logger.error(error_msg)
                 return self._create_fallback_result(filename, file_type, error_msg)
 
+            # 2. 규칙 기반 확인 (Hierarchical Filtering)
             rule_based_result = self.check_rules(filename, file_type)
             if rule_based_result:
                 logger.info(f"규칙 기반 분류 성공: {filename} -> {rule_based_result['folder_name']}")
@@ -224,8 +234,19 @@ class FileClassifier:
             if not self.llm_client:
                  raise ValueError("LLM Client not initialized")
 
+            # 3. API 호출
             response = self.llm_client.call(prompt)
-            return self._process_llm_response(response, filename, file_type)
+            result = self._process_llm_response(response, filename, file_type)
+
+            # 4. 결과 저장 (Memoization)
+            if result.get("status") == ClassificationStatus.SUCCESS.value and file_path and file_hash:
+                try:
+                    file_size = Path(file_path).stat().st_size
+                    self.history_db.save_result(file_hash, filename, file_size, result)
+                except Exception as e:
+                    logger.warning(f"DB 저장 실패: {e}")
+
+            return result
 
         except Exception as e:
             error_msg = f"분류 중 오류 발생: {str(e)}"

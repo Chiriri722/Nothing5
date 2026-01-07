@@ -92,7 +92,8 @@ class CLIHandler:
             result = self.app.classifier.classify_file(
                 filename=file_path.name,
                 file_type=file_path.suffix.lstrip('.'),
-                content=content
+                content=content,
+                file_path=str(file_path)
             )
 
             if result.get('status') == 'success':
