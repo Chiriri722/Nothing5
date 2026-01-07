@@ -27,6 +27,7 @@ from modules.classifier import FileClassifier
 from modules.mover import FileMover, DuplicateHandlingStrategy
 from modules.undo_manager import UndoManager
 from modules.watcher import FolderMonitor
+from modules.worker import FileProcessingWorker
 from modules.cli import CLIHandler
 
 # UI import (Optional)
@@ -99,12 +100,6 @@ class FileClassifierApp:
         asyncio.set_event_loop(self.loop)
         self.queue = asyncio.Queue()
         self.worker_task = None
-        self.active_tasks = set()
-
-        # Concurrency control
-        # Using a semaphore to limit concurrent file processing
-        self.concurrency_limit = getattr(cfg, 'MAX_CONCURRENT_FILE_PROCESSING', 20)
-        self.semaphore = asyncio.Semaphore(self.concurrency_limit)
 
         self.extractor = FileExtractor()
         self.classifier: Optional[FileClassifier] = None
@@ -120,11 +115,23 @@ class FileClassifierApp:
         # Initialize Classifier
         self._init_classifier()
 
+        # Initialize Worker
+        self.worker = FileProcessingWorker(
+            queue=self.queue,
+            extractor=self.extractor,
+            classifier=self.classifier,
+            mover=self.mover,
+            stats=self.stats,
+            gui_update_callback=self._update_gui_callback if self.gui_mode else None
+        )
+
         # Initialize GUI if needed
         if self.gui_mode:
             self.logger.info("Initializing GUI mode...")
             self.gui = FileClassifierGUI()
             self._setup_gui_callbacks()
+            # Update worker callback now that GUI exists
+            self.worker.gui_update_callback = self._update_gui_callback
             self.logger.info("GUI initialization complete")
         else:
             self.logger.info("Running in CLI mode")
@@ -146,13 +153,22 @@ class FileClassifierApp:
                 base_url=cfg.OPENAI_BASE_URL,
                 model=cfg.LLM_MODEL
             )
+
+            # Update worker classifier reference if worker exists
+            if hasattr(self, 'worker'):
+                self.worker.classifier = self.classifier
+
             self.logger.info("FileClassifier initialized")
         except ValueError as e:
             self.logger.warning(f"FileClassifier initialization failed: {e}")
             self.classifier = None
+            if hasattr(self, 'worker'):
+                self.worker.classifier = None
         except ImportError as e:
             self.logger.error(f"Missing required package: {e}")
             self.classifier = None
+            if hasattr(self, 'worker'):
+                self.worker.classifier = None
 
     def _setup_signal_handlers(self) -> None:
         """Setup signal handlers"""
@@ -177,6 +193,14 @@ class FileClassifierApp:
         self.gui.set_on_redo(self._on_redo)
         self.gui.set_on_export_log(self._on_export_log)
         self.gui.set_on_settings_changed(self._on_settings_changed)
+
+    def _update_gui_callback(self, filename: str, folder_name: str, status: str):
+        """Callback to update GUI from worker"""
+        if self.gui:
+            self.gui.safe_update_ui(
+                self.gui.on_file_processed_event,
+                (filename, folder_name, status)
+            )
 
     def _on_settings_changed(self) -> None:
         """Callback for settings change"""
@@ -209,7 +233,7 @@ class FileClassifierApp:
 
         # Start worker if not already running
         if not self.worker_task or self.worker_task.done():
-             future = asyncio.run_coroutine_threadsafe(self._process_queue_worker(), self.loop)
+             future = asyncio.run_coroutine_threadsafe(self.worker.run(), self.loop)
              self.worker_task = future
 
         # Scan files
@@ -262,7 +286,7 @@ class FileClassifierApp:
 
             # Start Async Worker
             if not self.worker_task or self.worker_task.done():
-                future = asyncio.run_coroutine_threadsafe(self._process_queue_worker(), self.loop)
+                future = asyncio.run_coroutine_threadsafe(self.worker.run(), self.loop)
                 self.worker_task = future
 
             if self.gui:
@@ -291,102 +315,6 @@ class FileClassifierApp:
 
         self.loop.call_soon_threadsafe(self.queue.put_nowait, file_path)
         self.logger.info(f"File queued: {file_path}")
-
-    async def _process_queue_worker(self):
-        """
-        Async file processing worker.
-        Optimized to handle multiple files concurrently using Semaphore.
-        """
-        logger = self.logger
-        logger.info("Async worker started")
-
-        while self.is_running:
-            try:
-                # Wait for a file from the queue
-                try:
-                    file_path = await asyncio.wait_for(self.queue.get(), timeout=1.0)
-                except asyncio.TimeoutError:
-                    continue
-
-                # Create a task for processing the file
-                # Acquire semaphore inside the task to limit concurrency
-                task = asyncio.create_task(self._process_file_bounded(file_path))
-
-                # Keep track of active tasks (optional, good for cleanup)
-                self.active_tasks.add(task)
-                task.add_done_callback(self.active_tasks.discard)
-
-                self.queue.task_done()
-
-            except Exception as e:
-                logger.error(f"Worker loop error: {e}", exc_info=True)
-                await asyncio.sleep(1)
-
-    async def _process_file_bounded(self, file_path: str):
-        """Wrapper to process file with semaphore limit"""
-        async with self.semaphore:
-            await self._process_file_async(file_path)
-
-    async def _process_file_async(self, file_path: str):
-        """Single file async processing pipeline"""
-        try:
-            file_path_obj = Path(file_path)
-
-            if not file_path_obj.exists():
-                self.logger.warning(f"File does not exist: {file_path}")
-                return
-
-            # 1. Extract content (Async)
-            extracted = await self.extractor.extract_async(file_path)
-            content = extracted.get('content', '') if extracted else ''
-
-            # 2. Classify (Async)
-            if not self.classifier:
-                self.logger.warning("Classifier not initialized.")
-                return
-
-            file_type = file_path_obj.suffix.lstrip('.')
-
-            if self.classifier._is_image_file(file_type):
-                classification_result = await self.classifier.classify_image_async(file_path)
-            else:
-                classification_result = await self.classifier.classify_file_async(
-                    filename=file_path_obj.name,
-                    file_type=file_type,
-                    content=content,
-                    file_path=file_path
-                )
-
-            if classification_result.get('status') != 'success':
-                error_msg = classification_result.get('error', 'Classification failed')
-                self.logger.warning(f"Classification failed: {file_path} - {error_msg}")
-                self.stats['failed'] += 1
-                return
-
-            # 3. Move file (Async)
-            folder_name = classification_result.get('folder_name', 'Others')
-            move_result = await self.mover.move_file_async(file_path, folder_name)
-
-            if move_result.get('status') == 'success':
-                self.stats['successful'] += 1
-                self.stats['categories'][folder_name] = self.stats['categories'].get(folder_name, 0) + 1
-                self.logger.info(f"File processed: {file_path_obj.name} -> {folder_name}")
-
-                if self.gui:
-                    self.gui.safe_update_ui(
-                        self.gui.on_file_processed_event,
-                        (file_path_obj.name, folder_name, "✓")
-                    )
-            else:
-                error_msg = move_result.get('error', 'Move failed')
-                self.logger.error(f"Move failed: {file_path} - {error_msg}")
-                self.stats['failed'] += 1
-
-            self.stats['total_processed'] += 1
-
-        except Exception as e:
-            self.logger.error(f"Processing error (Async): {file_path} - {e}", exc_info=True)
-            self.stats['failed'] += 1
 
     def _on_undo(self) -> None:
         """Undo last action"""
@@ -478,6 +406,8 @@ class FileClassifierApp:
         """Stop application"""
         self.is_running = False
         self.logger.info("Application stopping...")
+        if hasattr(self, 'worker'):
+            asyncio.run_coroutine_threadsafe(self.worker.stop(), self.loop)
         self.cleanup()
 
     def cleanup(self) -> None:
