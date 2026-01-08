@@ -208,7 +208,7 @@ class FileExtractor:
 
     def extract_text_from_pdf(self, file_path: str) -> Optional[Dict[str, Any]]:
         """
-        PDF 파일에서 텍스트 추출
+        PDF 파일에서 텍스트 추출 (Smart Summary 적용)
         
         Args:
             file_path (str): PDF 파일 경로
@@ -228,16 +228,24 @@ class FileExtractor:
                 reader = PyPDF2.PdfReader(f)
                 page_count = len(reader.pages)
 
-                # 최대 5페이지까지만 읽기 (성능 최적화)
-                max_pages = min(5, page_count)
+                if page_count <= 5:
+                    # 페이지 수가 적으면 전체 읽기
+                    for page in reader.pages:
+                        text += page.extract_text() + "\n"
+                else:
+                    # 페이지 수가 많으면 앞 2페이지, 뒤 2페이지 읽기
+                    for i in range(2):
+                        text += reader.pages[i].extract_text() + "\n"
 
-                for i in range(max_pages):
-                    page = reader.pages[i]
-                    text += page.extract_text() + "\n"
+                    text += "\n\n...[중간 페이지 생략]...\n\n"
 
-            # 텍스트 길이 제한
-            if len(text) > 2000:
-                text = text[:1000] + "\n...[생략]...\n" + text[-1000:]
+                    for i in range(page_count - 2, page_count):
+                        if i >= 2: # 중복 방지
+                             text += reader.pages[i].extract_text() + "\n"
+
+            # 텍스트 길이 제한 (앞 1000자 + 뒤 1000자)
+            if len(text) > 2500: # 넉넉하게 2500자 이상일 때만 자르기
+                text = text[:1000] + "\n...[내용 생략]...\n" + text[-1000:]
 
             return {
                 "content": text,
@@ -251,7 +259,7 @@ class FileExtractor:
     
     def extract_text_from_docx(self, file_path: str) -> Optional[Dict[str, Any]]:
         """
-        DOCX 파일에서 텍스트 추출
+        DOCX 파일에서 텍스트 추출 (Smart Summary 적용)
         
         Args:
             file_path (str): DOCX 파일 경로
@@ -265,22 +273,34 @@ class FileExtractor:
 
         try:
             doc = docx.Document(file_path)
+            paragraphs = doc.paragraphs
+            total_paragraphs = len(paragraphs)
+
             full_text = []
 
-            # 본문 텍스트 추출 (최대 100문단까지만 읽어서 최적화)
-            for i, para in enumerate(doc.paragraphs):
-                if i >= 100: break
-                full_text.append(para.text)
+            if total_paragraphs <= 100:
+                # 문단 수가 적으면 전체 읽기 (최대 100문단)
+                for para in paragraphs:
+                    full_text.append(para.text)
+            else:
+                # 문단 수가 많으면 앞 50문단, 뒤 50문단 읽기
+                for i in range(50):
+                    full_text.append(paragraphs[i].text)
+
+                full_text.append("\n...[중간 문단 생략]...\n")
+
+                for i in range(total_paragraphs - 50, total_paragraphs):
+                    full_text.append(paragraphs[i].text)
 
             text = '\n'.join(full_text)
 
-            # 텍스트 길이 제한
-            if len(text) > 2000:
-                text = text[:1000] + "\n...[생략]...\n" + text[-1000:]
+            # 텍스트 길이 제한 (앞 1000자 + 뒤 1000자)
+            if len(text) > 2500:
+                 text = text[:1000] + "\n...[내용 생략]...\n" + text[-1000:]
 
             return {
                 "content": text,
-                "metadata": {"paragraph_count": len(doc.paragraphs)},
+                "metadata": {"paragraph_count": total_paragraphs},
                 "size": Path(file_path).stat().st_size
             }
 

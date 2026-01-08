@@ -163,7 +163,10 @@ MAX_CONCURRENT_API_CALLS = 5 # 동시에 실행할 API 호출 수
 def validate_config():
     """설정값 유효성 검사"""
     if not OPENAI_API_KEY:
-        raise ValueError("OPENAI_API_KEY 환경 변수가 설정되지 않았습니다.")
+        raise ValueError(
+            "API 키가 설정되지 않았습니다. \n"
+            ".env 파일 또는 설정 메뉴에서 OPENAI_API_KEY (또는 다른 제공자의 API Key)를 설정해주세요."
+        )
     
     if LLM_TEMPERATURE < 0 or LLM_TEMPERATURE > 2:
         raise ValueError("LLM_TEMPERATURE는 0~2 사이의 값이어야 합니다.")
