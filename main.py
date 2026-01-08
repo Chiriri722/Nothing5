@@ -16,12 +16,16 @@ project_root = Path(__file__).parent
 sys.path.insert(0, str(project_root))
 
 from modules.app import FileClassifierApp
+import config.config as config
 
 def main():
     """
     Main entry point function.
     Parses arguments and starts the application.
     """
+    # Load credentials (deferred loading)
+    config.load_credentials()
+
     parser = argparse.ArgumentParser(
         description="LLM-based File Classifier",
         epilog="Example: python main.py --gui (GUI Mode), python main.py --cli (CLI Mode)"

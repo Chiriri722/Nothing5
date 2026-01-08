@@ -46,51 +46,6 @@ LANGUAGE = "한국어"
 RECURSIVE_SEARCH = False
 MONITOR_INTERVAL = 5
 
-# 사용자 설정 파일 로드 (있다면)
-if USER_SETTINGS_FILE.exists():
-    try:
-        with open(USER_SETTINGS_FILE, 'r', encoding='utf-8') as f:
-            user_settings = json.load(f)
-            CREDENTIAL_SOURCE = user_settings.get("CREDENTIAL_SOURCE", CREDENTIAL_SOURCE)
-            MANUAL_API_KEY = user_settings.get("MANUAL_API_KEY", MANUAL_API_KEY)
-            LANGUAGE = user_settings.get("LANGUAGE", LANGUAGE)
-            RECURSIVE_SEARCH = user_settings.get("RECURSIVE_SEARCH", RECURSIVE_SEARCH)
-            MONITOR_INTERVAL = user_settings.get("MONITOR_INTERVAL", MONITOR_INTERVAL)
-
-            # 저장된 모델이 있으면 복원 (옵션)
-            if "LLM_MODEL" in user_settings:
-                LLM_MODEL = user_settings["LLM_MODEL"]
-
-    except Exception as e:
-        print(f"Failed to load user settings: {e}")
-
-# 자격 증명 소스에 따른 API 키 및 모델 초기화
-try:
-    if CREDENTIAL_SOURCE in ["gemini", "claude"]:
-        from modules.credential_manager import CredentialManager
-        cm = CredentialManager()
-
-        if CREDENTIAL_SOURCE == "gemini":
-            key = cm.detect_gemini_credentials()
-            if key:
-                OPENAI_API_KEY = key
-                if LLM_MODEL.startswith("gpt-"):
-                     LLM_MODEL = "gemini-pro"
-        elif CREDENTIAL_SOURCE == "claude":
-            key = cm.detect_claude_credentials()
-            if key:
-                OPENAI_API_KEY = key
-                if LLM_MODEL.startswith("gpt-"):
-                    LLM_MODEL = "claude-3-opus-20240229"
-
-    elif CREDENTIAL_SOURCE == "manual" and MANUAL_API_KEY:
-        OPENAI_API_KEY = MANUAL_API_KEY
-
-except ImportError:
-    pass
-except Exception as e:
-    print(f"Error loading credentials in config: {e}")
-
 # ========================
 # 파일 분류 설정
 # ========================
@@ -117,7 +72,6 @@ SUPPORTED_EXTENSIONS = {
 # 파일 모니터링 설정
 # ========================
 MONITOR_ENABLED = True
-# MONITOR_INTERVAL은 위에서 사용자 설정으로 로드됨
 MONITOR_DEBOUNCE_TIME = 1
 
 # ========================
@@ -158,7 +112,63 @@ MAX_CONCURRENT_FILE_PROCESSING = 20 # 동시에 처리할 파일 수 (추출/이
 MAX_CONCURRENT_API_CALLS = 5 # 동시에 실행할 API 호출 수
 
 # ========================
-# 함수
+# 초기화 함수
+# ========================
+def load_settings():
+    """사용자 설정을 로드합니다."""
+    global CREDENTIAL_SOURCE, MANUAL_API_KEY, LANGUAGE, RECURSIVE_SEARCH, MONITOR_INTERVAL, LLM_MODEL
+
+    if USER_SETTINGS_FILE.exists():
+        try:
+            with open(USER_SETTINGS_FILE, 'r', encoding='utf-8') as f:
+                user_settings = json.load(f)
+                CREDENTIAL_SOURCE = user_settings.get("CREDENTIAL_SOURCE", CREDENTIAL_SOURCE)
+                MANUAL_API_KEY = user_settings.get("MANUAL_API_KEY", MANUAL_API_KEY)
+                LANGUAGE = user_settings.get("LANGUAGE", LANGUAGE)
+                RECURSIVE_SEARCH = user_settings.get("RECURSIVE_SEARCH", RECURSIVE_SEARCH)
+                MONITOR_INTERVAL = user_settings.get("MONITOR_INTERVAL", MONITOR_INTERVAL)
+
+                if "LLM_MODEL" in user_settings:
+                    LLM_MODEL = user_settings["LLM_MODEL"]
+
+        except Exception as e:
+            print(f"Failed to load user settings: {e}")
+
+def load_credentials():
+    """자격 증명 소스에 따른 API 키를 로드합니다. (Lazy Loading)"""
+    global OPENAI_API_KEY, LLM_MODEL
+
+    # 먼저 설정을 로드하여 CREDENTIAL_SOURCE를 최신화
+    load_settings()
+
+    try:
+        if CREDENTIAL_SOURCE in ["gemini", "claude"]:
+            from modules.credential_manager import CredentialManager
+            cm = CredentialManager()
+
+            if CREDENTIAL_SOURCE == "gemini":
+                key = cm.detect_gemini_credentials()
+                if key:
+                    OPENAI_API_KEY = key
+                    if LLM_MODEL.startswith("gpt-"):
+                         LLM_MODEL = "gemini-pro"
+            elif CREDENTIAL_SOURCE == "claude":
+                key = cm.detect_claude_credentials()
+                if key:
+                    OPENAI_API_KEY = key
+                    if LLM_MODEL.startswith("gpt-"):
+                        LLM_MODEL = "claude-3-opus-20240229"
+
+        elif CREDENTIAL_SOURCE == "manual" and MANUAL_API_KEY:
+            OPENAI_API_KEY = MANUAL_API_KEY
+
+    except ImportError:
+        pass
+    except Exception as e:
+        print(f"Error loading credentials in config: {e}")
+
+# ========================
+# 유틸리티 함수
 # ========================
 def validate_config():
     """설정값 유효성 검사"""
@@ -248,3 +258,6 @@ def save_user_settings(settings: dict):
     if "MONITOR_INTERVAL" in settings: MONITOR_INTERVAL = settings["MONITOR_INTERVAL"]
     if "CREDENTIAL_SOURCE" in settings: CREDENTIAL_SOURCE = settings["CREDENTIAL_SOURCE"]
     if "MANUAL_API_KEY" in settings: MANUAL_API_KEY = settings["MANUAL_API_KEY"]
+
+# Load settings initially (cheap), but defer credentials (expensive/risky)
+load_settings()
