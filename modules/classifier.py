@@ -72,8 +72,6 @@ class FileClassifier:
 
     def __init__(self, api_key: Optional[str] = None, base_url: Optional[str] = None, model: Optional[str] = None):
         """FileClassifier 초기화"""
-        # API Key access modified to use module-level access (cfg.OPENAI_API_KEY)
-        # because the key is loaded lazily via config.load_credentials()
         self.api_key = api_key or cfg.OPENAI_API_KEY
         if not self.api_key:
             logger.error("OPENAI_API_KEY가 설정되지 않았습니다")
@@ -116,80 +114,79 @@ class FileClassifier:
             content=truncated_content,
         )
 
-    def _check_cache(self, file_path: str, file_hash: str) -> Optional[Dict[str, Any]]:
-        """Synchronous cache check."""
-        if file_path and file_hash:
-            cached_result = self.history_db.get_result(file_hash)
-            if cached_result:
-                logger.info(f"캐시된 결과 사용: {Path(file_path).name} -> {cached_result['folder_name']}")
-                return {**cached_result, "status": ClassificationStatus.SUCCESS.value}
+    def _check_cache_common(self, file_hash: str, filename: str) -> Optional[Dict[str, Any]]:
+        """Common logic for cache checking."""
+        if not file_hash:
+            return None
+        return None  # The actual DB call differs sync/async, handled in callers
+
+    def _process_classification_success(self, result: Dict[str, Any]) -> Dict[str, Any]:
+        """Post-processes a successful classification result."""
+        # This can be used for logging or metric updates if needed
+        return result
+
+    # --- Sync/Async Shared Logic Extraction ---
+
+    def _execute_rule_check(self, filename: str, file_type: str) -> Optional[Dict[str, Any]]:
+        """Execute rule-based checks."""
+        rule_based_result = self.check_rules(filename, file_type)
+        if rule_based_result:
+            logger.info(f"규칙 기반 분류 성공: {filename} -> {rule_based_result['folder_name']}")
+            return rule_based_result
         return None
 
-    async def _check_cache_async(self, file_path: str, file_hash: str) -> Optional[Dict[str, Any]]:
-        """Asynchronous cache check."""
-        if file_path and file_hash:
-            cached_result = await self.history_db.get_result_async(file_hash)
-            if cached_result:
-                logger.info(f"캐시된 결과 사용: {Path(file_path).name} -> {cached_result['folder_name']}")
-                return {**cached_result, "status": ClassificationStatus.SUCCESS.value}
-        return None
+    def _prepare_api_call(self, filename: str, file_type: str, content: str) -> str:
+        """Prepare prompt and validate client state before API call."""
+        if not filename or not file_type:
+             raise ValueError("Filename and file type are required")
 
-    def _save_to_history(self, file_path: str, file_hash: str, filename: str, result: Dict[str, Any]):
-        """Synchronous history save."""
-        if result.get("status") == ClassificationStatus.SUCCESS.value and file_path and file_hash:
-            try:
-                file_size = Path(file_path).stat().st_size
-                self.history_db.save_result(file_hash, filename, file_size, result)
-            except Exception as e:
-                logger.warning(f"DB 저장 실패: {e}")
+        if not self.llm_client:
+             raise ValueError("LLM Client not initialized")
 
-    async def _save_to_history_async(self, file_path: str, file_hash: str, filename: str, result: Dict[str, Any]):
-        """Asynchronous history save."""
-        if result.get("status") == ClassificationStatus.SUCCESS.value and file_path and file_hash:
-            try:
-                file_size = Path(file_path).stat().st_size
-                await self.history_db.save_result_async(file_hash, filename, file_size, result)
-            except Exception as e:
-                logger.warning(f"DB 저장 실패: {e}")
+        return self._prepare_classification_prompt(filename, file_type, content)
+
+    # --- Async Methods ---
 
     async def classify_file_async(
         self, filename: str, file_type: str, content: str, file_path: str = None
     ) -> Dict[str, Any]:
         """비동기 파일 분류"""
-        file_hash = None
-        if file_path:
-            file_hash = await self.history_db.get_file_hash_async(file_path)
-            cached = await self._check_cache_async(file_path, file_hash)
-            if cached: return cached
+        try:
+            # 1. Cache Check
+            file_hash = None
+            if file_path:
+                file_hash = await self.history_db.get_file_hash_async(file_path)
+                if file_hash:
+                    cached = await self.history_db.get_result_async(file_hash)
+                    if cached:
+                        logger.info(f"캐시된 결과 사용: {Path(file_path).name} -> {cached['folder_name']}")
+                        return {**cached, "status": ClassificationStatus.SUCCESS.value}
 
-        # 규칙 기반 확인
-        rule_based_result = self.check_rules(filename, file_type)
-        if rule_based_result:
-            return rule_based_result
+            # 2. Rule Check
+            rule_result = self._execute_rule_check(filename, file_type)
+            if rule_result: return rule_result
 
-        # API 호출
-        async with self.semaphore:
-            result = await self._classify_file_api_async(filename, file_type, content)
+            # 3. API Call
+            async with self.semaphore:
+                result = await self._classify_file_api_async(filename, file_type, content)
 
-        # 결과 저장
-        if file_path and file_hash:
-            await self._save_to_history_async(file_path, file_hash, filename, result)
+            # 4. Save History
+            if file_path and file_hash and result.get("status") == ClassificationStatus.SUCCESS.value:
+                file_size = Path(file_path).stat().st_size
+                await self.history_db.save_result_async(file_hash, filename, file_size, result)
 
-        return result
+            return result
+
+        except Exception as e:
+            return self._handle_classification_error(e, filename, file_type)
 
     async def _classify_file_api_async(self, filename: str, file_type: str, content: str) -> Dict[str, Any]:
         """실제 API 호출 로직 (비동기)"""
         try:
-            if not filename or not file_type:
-                return self._create_fallback_result(filename, file_type, "파일명 누락")
-
-            prompt = self._prepare_classification_prompt(filename, file_type, content)
+            prompt = self._prepare_api_call(filename, file_type, content)
 
             for attempt in range(3):
                 try:
-                    if not self.llm_client:
-                        raise ValueError("LLM Client not initialized")
-
                     response_text = await self.llm_client.call_async(prompt)
                     return self._process_llm_response(response_text, filename, file_type)
 
@@ -209,51 +206,43 @@ class FileClassifier:
         """비동기 이미지 분류"""
         return await asyncio.to_thread(self.classify_image, image_path)
 
+    # --- Sync Methods ---
+
     def classify_file(
         self, filename: str, file_type: str, content: str, file_path: str = None
     ) -> Dict[str, Any]:
-        """파일 분류 (동기) - 비동기 메서드의 동기 래퍼로 사용하려 했으나,
-           기존 동기 로직을 유지하면서 중복을 줄이는 방식으로 리팩토링합니다.
-        """
+        """파일 분류 (동기)"""
         logger.info(f"파일 분류 시작: {filename}")
 
         try:
+            # 1. Cache Check
             file_hash = None
             if file_path:
                 file_hash = self.history_db.get_file_hash(file_path)
-                cached = self._check_cache(file_path, file_hash)
-                if cached: return cached
+                if file_hash:
+                    cached = self.history_db.get_result(file_hash)
+                    if cached:
+                        logger.info(f"캐시된 결과 사용: {Path(file_path).name} -> {cached['folder_name']}")
+                        return {**cached, "status": ClassificationStatus.SUCCESS.value}
 
-            if not filename or not file_type:
-                error_msg = "파일명과 파일 타입이 필요합니다"
-                logger.error(error_msg)
-                return self._create_fallback_result(filename, file_type, error_msg)
+            # 2. Rule Check
+            rule_result = self._execute_rule_check(filename, file_type)
+            if rule_result: return rule_result
 
-            # 규칙 기반 확인
-            rule_based_result = self.check_rules(filename, file_type)
-            if rule_based_result:
-                logger.info(f"규칙 기반 분류 성공: {filename} -> {rule_based_result['folder_name']}")
-                return rule_based_result
-
-            prompt = self._prepare_classification_prompt(filename, file_type, content)
-
-            if not self.llm_client:
-                 raise ValueError("LLM Client not initialized")
-
-            # API 호출
+            # 3. API Call
+            prompt = self._prepare_api_call(filename, file_type, content)
             response = self.llm_client.call(prompt)
             result = self._process_llm_response(response, filename, file_type)
 
-            # 결과 저장
-            if file_path and file_hash:
-                self._save_to_history(file_path, file_hash, filename, result)
+            # 4. Save History
+            if file_path and file_hash and result.get("status") == ClassificationStatus.SUCCESS.value:
+                file_size = Path(file_path).stat().st_size
+                self.history_db.save_result(file_hash, filename, file_size, result)
 
             return result
 
         except Exception as e:
-            error_msg = f"분류 중 오류 발생: {str(e)}"
-            logger.error(error_msg, exc_info=True)
-            return self._create_fallback_result(filename, file_type, error_msg)
+            return self._handle_classification_error(e, filename, file_type)
 
     def classify_image(self, image_path: str) -> Dict[str, Any]:
         """이미지 분류"""
@@ -293,6 +282,14 @@ class FileClassifier:
             logger.error(error_msg, exc_info=True)
             filename = Path(image_path).name if image_path else "unknown"
             return self._create_fallback_result(filename, "image", error_msg)
+
+    # --- Helpers ---
+
+    def _handle_classification_error(self, error: Exception, filename: str, file_type: str) -> Dict[str, Any]:
+        """Centralized error handling."""
+        error_msg = f"분류 중 오류 발생: {str(error)}"
+        logger.error(error_msg, exc_info=True)
+        return self._create_fallback_result(filename, file_type, error_msg)
 
     def _process_llm_response(self, response_text: str, filename: str, file_type: str) -> Dict[str, Any]:
         """Helper to process LLM response and validate folder name."""

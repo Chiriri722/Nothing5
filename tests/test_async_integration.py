@@ -14,7 +14,14 @@ class TestAsyncIntegration(unittest.TestCase):
         self.classifier.history_db.save_result_async = AsyncMock()
 
         # Mocking API call
-        self.classifier._call_api_async = AsyncMock(return_value='{"folder_name": "test_folder", "category": "test", "confidence": 1.0, "reason": "test"}')
+        # Note: _classify_file_api_async is the method to mock, as it wraps the internal logic
+        self.classifier._classify_file_api_async = AsyncMock(return_value={
+            "folder_name": "test_folder",
+            "category": "test",
+            "confidence": 1.0,
+            "reason": "test",
+            "status": "success"
+        })
 
     def test_classify_file_async_flow(self):
         async def run_test():

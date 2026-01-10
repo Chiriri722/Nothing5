@@ -3,12 +3,13 @@
 파일 내용 추출 모듈
 
 PDF, DOCX, 이미지 등 다양한 파일 형식에서 텍스트와 메타데이터를 추출합니다.
+확장 가능한 핸들러 레지스트리 패턴을 사용하여 구조화되었습니다.
 """
 
 import logging
 import asyncio
 from pathlib import Path
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, Callable, Set
 
 try:
     import PyPDF2
@@ -35,27 +36,59 @@ class FileExtractor:
     지원 형식:
     - PDF
     - DOCX (Word 문서)
-    - TXT (텍스트)
+    - TXT (텍스트 및 코드)
     - 이미지 (PNG, JPG, etc. - 메타데이터)
+
+    새로운 파일 형식을 지원하려면 register_handler()를 사용하세요.
     """
     
     def __init__(self):
-        """FileExtractor 초기화"""
-        self.supported_extensions = [
-            '.pdf', '.docx', '.doc', '.txt', 
-            '.py', '.js', '.java', '.c', '.cpp', '.html', '.css', '.md', '.json', '.xml', '.yml', '.yaml',
-            '.png', '.jpg', '.jpeg', '.gif', '.bmp', '.svg', '.webp'
-        ]
+        """FileExtractor 초기화 및 기본 핸들러 등록"""
+        self._handlers: Dict[str, Callable[[str], Dict[str, Any]]] = {}
 
         # 텍스트 파일 확장자 목록
-        self.text_extensions = {
+        self.text_extensions: Set[str] = {
             '.txt', '.py', '.js', '.java', '.c', '.cpp', '.html', '.css', '.md', '.json', '.xml', '.yml', '.yaml'
         }
 
         # 이미지 파일 확장자 목록
-        self.image_extensions = {
+        self.image_extensions: Set[str] = {
             '.png', '.jpg', '.jpeg', '.gif', '.bmp', '.svg', '.webp'
         }
+
+        self._register_default_handlers()
+
+    def _register_default_handlers(self):
+        """기본 파일 핸들러 등록"""
+        # 텍스트 핸들러 등록
+        for ext in self.text_extensions:
+            self.register_handler(ext, self.extract_text_from_txt)
+
+        # 이미지 핸들러 등록
+        for ext in self.image_extensions:
+            self.register_handler(ext, self.extract_text_from_image)
+
+        # 문서 핸들러 등록
+        self.register_handler('.pdf', self.extract_text_from_pdf)
+        self.register_handler('.docx', self.extract_text_from_docx)
+        self.register_handler('.doc', self.extract_text_from_docx)
+
+    def register_handler(self, extension: str, handler: Callable[[str], Dict[str, Any]]):
+        """
+        특정 확장자에 대한 핸들러를 등록합니다.
+
+        Args:
+            extension (str): 파일 확장자 (예: '.pdf')
+            handler (Callable): 처리 함수
+        """
+        if not extension.startswith('.'):
+            extension = '.' + extension
+        self._handlers[extension.lower()] = handler
+
+    @property
+    def supported_extensions(self) -> list:
+        """지원되는 모든 확장자 목록 반환"""
+        return list(self._handlers.keys())
 
     async def extract_async(self, file_path: str) -> Optional[Dict[str, Any]]:
         """
@@ -84,37 +117,24 @@ class FileExtractor:
             return None
         
         suffix = path.suffix.lower()
-        if suffix not in self.supported_extensions:
+        handler = self._handlers.get(suffix)
+
+        if not handler:
             logger.warning(f"지원하지 않는 파일 형식입니다: {suffix}")
             return None
         
         logger.info(f"파일 추출 시작: {file_path}")
 
         try:
-            if suffix in self.text_extensions:
-                return self.extract_text_from_txt(str(path))
-            elif suffix == '.pdf':
-                return self.extract_text_from_pdf(str(path))
-            elif suffix in ['.docx', '.doc']:
-                return self.extract_text_from_docx(str(path))
-            elif suffix in self.image_extensions:
-                return self.extract_text_from_image(str(path))
+            return handler(str(path))
         except Exception as e:
             logger.error(f"추출 중 오류 발생 ({file_path}): {e}")
             return None
-
-        return None
     
     def extract_text_from_txt(self, file_path: str) -> Dict[str, Any]:
         """
         텍스트 파일에서 텍스트 추출 (Smart Summary: Front 1000 + Rear 1000)
         대용량 파일의 경우 전체를 읽지 않고 앞뒤 부분만 읽습니다.
-
-        Args:
-            file_path (str): 텍스트 파일 경로
-
-        Returns:
-            Dict[str, Any]: 추출 결과
         """
         try:
             file_size = Path(file_path).stat().st_size
@@ -123,7 +143,7 @@ class FileExtractor:
             content = ""
             encoding_used = ""
 
-            # 작은 파일은 한번에 읽기 (최적화: 파일을 한번만 읽고 메모리에서 디코딩 시도)
+            # 작은 파일은 한번에 읽기 (2500바이트 이하)
             if file_size <= 2500:
                 raw_data = b""
                 with open(file_path, 'rb') as f:
@@ -148,34 +168,24 @@ class FileExtractor:
                     "size": file_size
                 }
 
-            # 대용량 파일은 앞뒤 1000자만 읽기
-            # Seek을 사용하기 위해 바이트 모드로 열어서 디코딩
-
+            # 대용량 파일 처리
             front_text = ""
             rear_text = ""
             encoding_used = "utf-8" # 기본 가정
 
-            # 앞부분 읽기
             with open(file_path, 'rb') as f:
-                # 넉넉하게 읽어서 디코딩 (멀티바이트 문자 고려)
                 front_bytes = f.read(1500)
-
-                # 뒷부분 읽기
-                f.seek(0, 2) # 끝으로 이동
+                f.seek(0, 2)
                 file_end_pos = f.tell()
                 seek_pos = max(0, file_end_pos - 1500)
                 f.seek(seek_pos)
                 rear_bytes = f.read()
 
-            # 디코딩 시도
             for enc in encodings:
                 try:
-                    # 인코딩 감지를 위해 엄격한 모드로 시도 (중간 잘림 방지를 위해 약간 줄여서 테스트)
-                    # 앞부분의 대부분이 정상적으로 디코딩된다면 해당 인코딩일 확률이 높음
-                    test_bytes = front_bytes[:-4] # 멀티바이트 문자 최대 길이만큼 제외하고 테스트
-                    test_bytes.decode(enc) # 실패시 UnicodeDecodeError 발생
+                    test_bytes = front_bytes[:-4]
+                    test_bytes.decode(enc)
 
-                    # 인코딩이 확인되면, 실제 변환은 errors='ignore'로 수행 (바운더리 잘림 처리)
                     front_text = front_bytes.decode(enc, errors='ignore')
                     rear_text = rear_bytes.decode(enc, errors='ignore')
                     encoding_used = enc
@@ -183,13 +193,11 @@ class FileExtractor:
                 except UnicodeDecodeError:
                     continue
 
-            # 모든 인코딩 실패시 (여기까지 올 일은 거의 없지만)
             if not encoding_used:
                  front_text = front_bytes.decode('utf-8', errors='ignore')
                  rear_text = rear_bytes.decode('utf-8', errors='ignore')
                  encoding_used = 'utf-8-ignore'
 
-            # 길이 맞추기
             front_text = front_text[:1000]
             rear_text = rear_text[-1000:]
 
@@ -197,7 +205,7 @@ class FileExtractor:
 
             return {
                 "content": extracted_text,
-                "metadata": {"original_length": file_size}, # 근사치
+                "metadata": {"original_length": file_size},
                 "encoding": encoding_used,
                 "size": file_size
             }
@@ -207,15 +215,7 @@ class FileExtractor:
             raise
 
     def extract_text_from_pdf(self, file_path: str) -> Optional[Dict[str, Any]]:
-        """
-        PDF 파일에서 텍스트 추출 (Smart Summary 적용)
-        
-        Args:
-            file_path (str): PDF 파일 경로
-            
-        Returns:
-            Optional[Dict[str, Any]]: 추출 결과
-        """
+        """PDF 파일에서 텍스트 추출 (Smart Summary 적용)"""
         if not PyPDF2:
             logger.warning("PyPDF2가 설치되지 않았습니다.")
             return None
@@ -229,22 +229,17 @@ class FileExtractor:
                 page_count = len(reader.pages)
 
                 if page_count <= 5:
-                    # 페이지 수가 적으면 전체 읽기
                     for page in reader.pages:
                         text += page.extract_text() + "\n"
                 else:
-                    # 페이지 수가 많으면 앞 2페이지, 뒤 2페이지 읽기
                     for i in range(2):
                         text += reader.pages[i].extract_text() + "\n"
-
                     text += "\n\n...[중간 페이지 생략]...\n\n"
-
                     for i in range(page_count - 2, page_count):
-                        if i >= 2: # 중복 방지
+                        if i >= 2:
                              text += reader.pages[i].extract_text() + "\n"
 
-            # 텍스트 길이 제한 (앞 1000자 + 뒤 1000자)
-            if len(text) > 2500: # 넉넉하게 2500자 이상일 때만 자르기
+            if len(text) > 2500:
                 text = text[:1000] + "\n...[내용 생략]...\n" + text[-1000:]
 
             return {
@@ -258,15 +253,7 @@ class FileExtractor:
             raise
     
     def extract_text_from_docx(self, file_path: str) -> Optional[Dict[str, Any]]:
-        """
-        DOCX 파일에서 텍스트 추출 (Smart Summary 적용)
-        
-        Args:
-            file_path (str): DOCX 파일 경로
-            
-        Returns:
-            Optional[Dict[str, Any]]: 추출 결과
-        """
+        """DOCX 파일에서 텍스트 추출 (Smart Summary 적용)"""
         if not docx:
             logger.warning("python-docx가 설치되지 않았습니다.")
             return None
@@ -275,26 +262,20 @@ class FileExtractor:
             doc = docx.Document(file_path)
             paragraphs = doc.paragraphs
             total_paragraphs = len(paragraphs)
-
             full_text = []
 
             if total_paragraphs <= 100:
-                # 문단 수가 적으면 전체 읽기 (최대 100문단)
                 for para in paragraphs:
                     full_text.append(para.text)
             else:
-                # 문단 수가 많으면 앞 50문단, 뒤 50문단 읽기
                 for i in range(50):
                     full_text.append(paragraphs[i].text)
-
                 full_text.append("\n...[중간 문단 생략]...\n")
-
                 for i in range(total_paragraphs - 50, total_paragraphs):
                     full_text.append(paragraphs[i].text)
 
             text = '\n'.join(full_text)
 
-            # 텍스트 길이 제한 (앞 1000자 + 뒤 1000자)
             if len(text) > 2500:
                  text = text[:1000] + "\n...[내용 생략]...\n" + text[-1000:]
 
@@ -306,18 +287,10 @@ class FileExtractor:
 
         except Exception as e:
             logger.error(f"DOCX 추출 오류: {e}")
-            return None # DOCX 오류는 무시하고 None 반환 (분류 시 fallback 사용)
+            return None
     
     def extract_text_from_image(self, file_path: str) -> Optional[Dict[str, Any]]:
-        """
-        이미지 파일에서 메타데이터 추출
-        
-        Args:
-            file_path (str): 이미지 파일 경로
-            
-        Returns:
-            Optional[Dict[str, Any]]: 추출 결과
-        """
+        """이미지 파일에서 메타데이터 추출"""
         if not Image:
             logger.warning("Pillow가 설치되지 않았습니다.")
             return None
@@ -328,7 +301,6 @@ class FileExtractor:
                 format_ = img.format
                 mode = img.mode
 
-                # 메타데이터를 텍스트로 변환하여 LLM에 제공
                 content = f"이미지 정보:\n형식: {format_}\n크기: {width}x{height}\n모드: {mode}"
 
                 return {
