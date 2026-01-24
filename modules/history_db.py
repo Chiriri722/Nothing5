@@ -47,6 +47,8 @@ class ProcessingHistory:
                         timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
                     )
                 """)
+                # 성능을 위한 추가 인덱스 (필요 시 활성화)
+                # cursor.execute("CREATE INDEX IF NOT EXISTS idx_filename ON processed_files(filename)")
                 conn.commit()
         except Exception as e:
             logger.error(f"DB 초기화 실패: {e}")
@@ -69,18 +71,19 @@ class ProcessingHistory:
             # 대용량 파일 (10MB 이상) 최적화: 부분 해시
             if file_size > 10 * 1024 * 1024:
                 with open(file_path, "rb") as f:
-                    # 처음 4KB
-                    sha256_hash.update(f.read(4096))
-                    # 중간 4KB
+                    # 처음 64KB (최적화: 4KB -> 64KB)
+                    sha256_hash.update(f.read(65536))
+                    # 중간 64KB
                     f.seek(file_size // 2)
-                    sha256_hash.update(f.read(4096))
-                    # 마지막 4KB
-                    f.seek(-4096, 2)
-                    sha256_hash.update(f.read(4096))
+                    sha256_hash.update(f.read(65536))
+                    # 마지막 64KB
+                    f.seek(-65536, 2)
+                    sha256_hash.update(f.read(65536))
                     # 파일 크기 추가 (충돌 방지)
                     sha256_hash.update(str(file_size).encode('utf-8'))
             else:
                 # 작은 파일: 전체 해시
+                # 버퍼 크기 64KB로 증가 (기본값보다 큼)
                 with open(file_path, "rb") as f:
                     for byte_block in iter(lambda: f.read(65536), b""):
                         sha256_hash.update(byte_block)
