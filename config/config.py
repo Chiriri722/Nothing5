@@ -16,7 +16,14 @@ load_dotenv()
 # ========================
 # 기본 경로 설정
 # ========================
-PROJECT_ROOT = Path(__file__).parent.parent
+import sys
+if getattr(sys, 'frozen', False):
+    # PyInstaller로 빌드된 경우 실행 파일 위치 기준
+    PROJECT_ROOT = Path(sys.executable).parent
+else:
+    # 일반 실행 시 현재 파일 기준
+    PROJECT_ROOT = Path(__file__).parent.parent
+
 LOGS_DIR = PROJECT_ROOT / "logs"
 UNDO_HISTORY_FILE = PROJECT_ROOT / "undo_history.json"
 USER_SETTINGS_FILE = PROJECT_ROOT / "user_settings.json"
