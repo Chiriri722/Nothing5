@@ -51,6 +51,7 @@ logs/
 
 # 언두 히스토리
 undo_history.json
+processed_files.db
 
 # 임시 파일
 *.tmp
