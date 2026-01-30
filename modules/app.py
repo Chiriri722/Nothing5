@@ -70,8 +70,9 @@ class FileClassifierApp:
         # Mode setting
         self.gui_mode = gui_mode and HAS_GUI
 
-        # Config Validation
+        # Load Credentials & Validate Config
         try:
+            cfg.load_credentials()  # Load keys from all sources
             validate_config()
             self.logger.info("Configuration validation successful")
         except ValueError as e:

@@ -27,6 +27,8 @@ def build():
         '--hidden-import=modules',
         '--hidden-import=config',
         '--hidden-import=ui',
+        '--hidden-import=watchdog',
+        '--hidden-import=watchdog.observers',
         
         # Data files (if any needed)
         # '--add-data=config;config',     # Example: include config folder if needed inside bundle
@@ -34,7 +36,8 @@ def build():
     
     # Platform specific
     if sys.platform == "win32":
-        args.append('--windowed')         # No console window for GUI app
+        # args.append('--windowed')         # No console window for GUI app (Commented out for debugging)
+        pass
         # args.append('--icon=assets/icon.ico') # Add icon if available
     
     # Run PyInstaller

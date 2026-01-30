@@ -181,8 +181,11 @@ def validate_config():
     """설정값 유효성 검사"""
     if not OPENAI_API_KEY:
         raise ValueError(
-            "API 키가 설정되지 않았습니다. \n"
-            ".env 파일 또는 설정 메뉴에서 OPENAI_API_KEY (또는 다른 제공자의 API Key)를 설정해주세요."
+            "API 키가 설정되지 않았습니다.\n"
+            "다음 방법 중 하나로 해결하세요:\n"
+            "1. .env 파일에 OPENAI_API_KEY 설정\n"
+            "2. '설정' 메뉴에서 API 키 입력\n"
+            "3. Gemini/Claude 등 지원되는 자격 증명 사용"
         )
     
     if LLM_TEMPERATURE < 0 or LLM_TEMPERATURE > 2:

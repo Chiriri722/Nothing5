@@ -186,6 +186,7 @@ class FileClassifierGUI:
         self.ui_queue: Queue = Queue()
         
         # 콜백 함수
+        self.on_classify: Optional[Callable] = None
         self.on_file_processed: Optional[Callable] = None
         self.on_start_monitoring: Optional[Callable] = None
         self.on_stop_monitoring: Optional[Callable] = None
@@ -770,7 +771,7 @@ class FileClassifierGUI:
         """
         설정 대화 표시
         """
-        SettingsDialog(self)
+        SettingsDialog(self.root)
     
     def _show_history(self) -> None:
         """
@@ -935,6 +936,15 @@ class FileClassifierGUI:
         logger.info("GUI 시작")
         self.root.mainloop()
     
+    def set_on_classify(self, callback: Callable) -> None:
+        """
+        수동 분류 콜백 설정
+        
+        Args:
+            callback (Callable): 콜백 함수
+        """
+        self.on_classify = callback
+
     def set_on_file_processed(self, callback: Callable) -> None:
         """
         파일 처리 콜백 설정
