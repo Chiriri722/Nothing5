@@ -124,7 +124,7 @@ class FileProcessingWorker:
 
             file_type = file_path_obj.suffix.lstrip('.')
 
-            if self.classifier._is_image_file(file_type):
+            if self.classifier.is_image_file(file_type):
                 classification_result = await self.classifier.classify_image_async(file_path)
             else:
                 classification_result = await self.classifier.classify_file_async(
@@ -141,7 +141,7 @@ class FileProcessingWorker:
                 return
 
             # 3. Move file (Async)
-            folder_name = classification_result.get('folder_name', 'Others')
+            folder_name = classification_result.get('folder_name', cfg.DEFAULT_FOLDER_NAME)
             move_result = await self.mover.move_file_async(file_path, folder_name)
 
             if move_result.get('status') == 'success':

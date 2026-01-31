@@ -251,7 +251,7 @@ class FileClassifier:
             if rule_based_result:
                  return rule_based_result
 
-            if not self._is_image_file(file_type):
+            if not self.is_image_file(file_type):
                 return self._create_fallback_result(filename, file_type, "이미지 파일이 아닙니다")
 
             if not isinstance(self.llm_client, OpenAIClient):
@@ -309,7 +309,7 @@ class FileClassifier:
                 return {
                     "status": ClassificationStatus.SUCCESS.value,
                     "folder_name": folder,
-                    "category": FILE_TYPE_MAPPING.get(file_type_lower, "기타"),
+                    "category": FILE_TYPE_MAPPING.get(file_type_lower, cfg.DEFAULT_FOLDER_NAME),
                     "confidence": 1.0,
                     "reason": f"파일명 키워드 매칭 ('{keyword}')"
                 }
@@ -319,7 +319,7 @@ class FileClassifier:
             return {
                 "status": ClassificationStatus.SUCCESS.value,
                 "folder_name": folder_name,
-                "category": FILE_TYPE_MAPPING.get(file_type_lower, "기타"),
+                "category": FILE_TYPE_MAPPING.get(file_type_lower, cfg.DEFAULT_FOLDER_NAME),
                 "confidence": 0.95,
                 "reason": f"확장자 기반 규칙 ('{file_type}')"
             }
@@ -350,7 +350,7 @@ class FileClassifier:
         return cleaned
 
     def _create_fallback_folder_name(self, filename: str, file_type: str) -> str:
-        category = FILE_TYPE_MAPPING.get(file_type.lower(), "기타")
+        category = FILE_TYPE_MAPPING.get(file_type.lower(), cfg.DEFAULT_FOLDER_NAME)
         name_without_ext = Path(filename).stem
         cleaned_name = re.sub(self.FORBIDDEN_CHARS, "", name_without_ext).strip()[:20]
         if cleaned_name and len(cleaned_name) >= 2: return cleaned_name
@@ -359,8 +359,8 @@ class FileClassifier:
     def _create_error_result(self, error_msg: str) -> Dict[str, Any]:
         return {
             "status": ClassificationStatus.ERROR.value,
-            "folder_name": "기타",
-            "category": "기타",
+            "folder_name": cfg.DEFAULT_FOLDER_NAME,
+            "category": cfg.DEFAULT_FOLDER_NAME,
             "confidence": 0.0,
             "reason": "분류 실패",
             "error": error_msg,
@@ -368,7 +368,7 @@ class FileClassifier:
 
     def _create_fallback_result(self, filename: str, file_type: str, error_msg: str) -> Dict[str, Any]:
         folder_name = self._create_fallback_folder_name(filename, file_type)
-        category = FILE_TYPE_MAPPING.get(file_type.lower(), "기타")
+        category = FILE_TYPE_MAPPING.get(file_type.lower(), cfg.DEFAULT_FOLDER_NAME)
         return {
             "status": ClassificationStatus.SUCCESS.value,
             "folder_name": folder_name,
@@ -377,7 +377,7 @@ class FileClassifier:
             "reason": f"폴백 분류 (오류: {error_msg})",
         }
 
-    def _is_image_file(self, file_type: str) -> bool:
+    def is_image_file(self, file_type: str) -> bool:
         return file_type.lower() in {"jpg", "jpeg", "png", "gif", "bmp", "svg", "webp"}
 
     def _encode_image_to_base64(self, image_path: str) -> str:

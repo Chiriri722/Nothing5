@@ -56,6 +56,8 @@ MONITOR_INTERVAL = 5
 # ========================
 # 파일 분류 설정
 # ========================
+DEFAULT_FOLDER_NAME = "기타"
+
 DEFAULT_CATEGORIES = [
     "문서",
     "이미지",

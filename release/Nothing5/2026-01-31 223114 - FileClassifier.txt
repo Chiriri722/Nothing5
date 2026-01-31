@@ -1,0 +1,337 @@
+2026-01-31 22:31:14 - FileClassifier - INFO - ============================================================
+2026-01-31 22:31:14 - FileClassifier - INFO - LLM-based Automatic File Classifier
+2026-01-31 22:31:14 - FileClassifier - INFO - Start Time: 2026-01-31 22:31:14
+2026-01-31 22:31:14 - FileClassifier - INFO - Project Root: C:\Users\White\Documents\GitHub\release\Nothing5
+2026-01-31 22:31:14 - FileClassifier - INFO - ============================================================
+2026-01-31 22:31:14 - FileClassifier - INFO - Configuration validation successful
+2026-01-31 22:31:14 - FileClassifier - INFO - Initializing modules...
+2026-01-31 22:31:17 - FileClassifier - INFO - FileClassifier initialized
+2026-01-31 22:31:17 - FileClassifier - INFO - Initializing GUI mode...
+2026-01-31 22:31:20 - FileClassifier - INFO - GUI initialization complete
+2026-01-31 22:31:20 - FileClassifier - INFO - Application initialization complete
+2026-01-31 22:31:20 - FileClassifier - INFO - Starting GUI...
+2026-01-31 22:31:46 - FileClassifier - INFO - Monitoring started: C:/Users/White/Documents
+2026-01-31 22:32:47 - FileClassifier - INFO - Monitoring stopped
+2026-01-31 22:33:01 - FileClassifier - WARNING - Nothing to redo.
+2026-01-31 22:33:06 - FileClassifier - INFO - Monitoring started: C:/Users/White/Documents
+Processing error (Async): FileCreatedEvent(src_path='C:\\Users\\White\\Documents\\Project_Relog\\node_modules\\electron\\dist\\locales\\bg.pak', dest_path='', event_type='created', is_directory=False, is_synthetic=False) - argument should be a str or an os.PathLike object where __fspath__ returns a str, not 'FileCreatedEvent'
+Traceback (most recent call last):
+  File "modules\worker.py", line 110, in _process_file_async
+  File "pathlib\__init__.py", line 150, in __init__
+TypeError: argument should be a str or an os.PathLike object where __fspath__ returns a str, not 'FileCreatedEvent'
+2026-01-31 22:33:06 - FileClassifier - INFO - File queued: FileCreatedEvent(src_path='C:\\Users\\White\\Documents\\Project_Relog\\node_modules\\electron\\dist\\locales\\bg.pak', dest_path='', event_type='created', is_directory=False, is_synthetic=False)
+2026-01-31 22:33:06 - FileClassifier - INFO - File queued: FileCreatedEvent(src_path='C:\\Users\\White\\Documents\\Project_Relog\\node_modules\\electron\\dist\\libGLESv2.dll', dest_path='', event_type='created', is_directory=False, is_synthetic=False)
+Processing error (Async): FileCreatedEvent(src_path='C:\\Users\\White\\Documents\\Project_Relog\\node_modules\\electron\\dist\\libGLESv2.dll', dest_path='', event_type='created', is_directory=False, is_synthetic=False) - argument should be a str or an os.PathLike object where __fspath__ returns a str, not 'FileCreatedEvent'
+Traceback (most recent call last):
+  File "modules\worker.py", line 110, in _process_file_async
+  File "pathlib\__init__.py", line 150, in __init__
+TypeError: argument should be a str or an os.PathLike object where __fspath__ returns a str, not 'FileCreatedEvent'
+2026-01-31 22:33:06 - FileClassifier - INFO - File queued: FileCreatedEvent(src_path='C:\\Users\\White\\Documents\\Project_Relog\\node_modules\\electron\\dist\\version', dest_path='', event_type='created', is_directory=False, is_synthetic=False)
+Processing error (Async): FileCreatedEvent(src_path='C:\\Users\\White\\Documents\\Project_Relog\\node_modules\\electron\\dist\\version', dest_path='', event_type='created', is_directory=False, is_synthetic=False) - argument should be a str or an os.PathLike object where __fspath__ returns a str, not 'FileCreatedEvent'
+Traceback (most recent call last):
+  File "modules\worker.py", line 110, in _process_file_async
+  File "pathlib\__init__.py", line 150, in __init__
+TypeError: argument should be a str or an os.PathLike object where __fspath__ returns a str, not 'FileCreatedEvent'
+2026-01-31 22:33:07 - FileClassifier - INFO - File queued: FileCreatedEvent(src_path='C:\\Users\\White\\Documents\\Project_Relog\\node_modules\\electron\\dist\\locales\\af.pak', dest_path='', event_type='created', is_directory=False, is_synthetic=False)
+Processing error (Async): FileCreatedEvent(src_path='C:\\Users\\White\\Documents\\Project_Relog\\node_modules\\electron\\dist\\locales\\af.pak', dest_path='', event_type='created', is_directory=False, is_synthetic=False) - argument should be a str or an os.PathLike object where __fspath__ returns a str, not 'FileCreatedEvent'
+Traceback (most recent call last):
+  File "modules\worker.py", line 110, in _process_file_async
+  File "pathlib\__init__.py", line 150, in __init__
+TypeError: argument should be a str or an os.PathLike object where __fspath__ returns a str, not 'FileCreatedEvent'
+2026-01-31 22:33:07 - FileClassifier - INFO - File queued: FileCreatedEvent(src_path='C:\\Users\\White\\Documents\\Project_Relog\\node_modules\\electron\\dist\\snapshot_blob.bin', dest_path='', event_type='created', is_directory=False, is_synthetic=False)
+Processing error (Async): FileCreatedEvent(src_path='C:\\Users\\White\\Documents\\Project_Relog\\node_modules\\electron\\dist\\snapshot_blob.bin', dest_path='', event_type='created', is_directory=False, is_synthetic=False) - argument should be a str or an os.PathLike object where __fspath__ returns a str, not 'FileCreatedEvent'
+Traceback (most recent call last):
+  File "modules\worker.py", line 110, in _process_file_async
+  File "pathlib\__init__.py", line 150, in __init__
+TypeError: argument should be a str or an os.PathLike object where __fspath__ returns a str, not 'FileCreatedEvent'
+2026-01-31 22:33:07 - FileClassifier - INFO - File queued: FileCreatedEvent(src_path='C:\\Users\\White\\Documents\\Project_Relog\\node_modules\\electron\\dist\\locales\\es-419.pak', dest_path='', event_type='created', is_directory=False, is_synthetic=False)
+Processing error (Async): FileCreatedEvent(src_path='C:\\Users\\White\\Documents\\Project_Relog\\node_modules\\electron\\dist\\locales\\es-419.pak', dest_path='', event_type='created', is_directory=False, is_synthetic=False) - argument should be a str or an os.PathLike object where __fspath__ returns a str, not 'FileCreatedEvent'
+Traceback (most recent call last):
+  File "modules\worker.py", line 110, in _process_file_async
+  File "pathlib\__init__.py", line 150, in __init__
+TypeError: argument should be a str or an os.PathLike object where __fspath__ returns a str, not 'FileCreatedEvent'
+2026-01-31 22:33:07 - FileClassifier - INFO - File queued: FileCreatedEvent(src_path='C:\\Users\\White\\Documents\\Project_Relog\\node_modules\\electron\\dist\\locales\\th.pak', dest_path='', event_type='created', is_directory=False, is_synthetic=False)
+Processing error (Async): FileCreatedEvent(src_path='C:\\Users\\White\\Documents\\Project_Relog\\node_modules\\electron\\dist\\locales\\th.pak', dest_path='', event_type='created', is_directory=False, is_synthetic=False) - argument should be a str or an os.PathLike object where __fspath__ returns a str, not 'FileCreatedEvent'
+Traceback (most recent call last):
+  File "modules\worker.py", line 110, in _process_file_async
+  File "pathlib\__init__.py", line 150, in __init__
+TypeError: argument should be a str or an os.PathLike object where __fspath__ returns a str, not 'FileCreatedEvent'
+2026-01-31 22:33:07 - FileClassifier - INFO - File queued: FileCreatedEvent(src_path='C:\\Users\\White\\Documents\\Project_Relog\\node_modules\\electron\\dist\\locales\\sl.pak', dest_path='', event_type='created', is_directory=False, is_synthetic=False)
+Processing error (Async): FileCreatedEvent(src_path='C:\\Users\\White\\Documents\\Project_Relog\\node_modules\\electron\\dist\\locales\\sl.pak', dest_path='', event_type='created', is_directory=False, is_synthetic=False) - argument should be a str or an os.PathLike object where __fspath__ returns a str, not 'FileCreatedEvent'
+Traceback (most recent call last):
+  File "modules\worker.py", line 110, in _process_file_async
+  File "pathlib\__init__.py", line 150, in __init__
+TypeError: argument should be a str or an os.PathLike object where __fspath__ returns a str, not 'FileCreatedEvent'
+2026-01-31 22:33:07 - FileClassifier - INFO - File queued: FileCreatedEvent(src_path='C:\\Users\\White\\Documents\\Project_Relog\\node_modules\\electron\\dist\\locales\\kn.pak', dest_path='', event_type='created', is_directory=False, is_synthetic=False)
+Processing error (Async): FileCreatedEvent(src_path='C:\\Users\\White\\Documents\\Project_Relog\\node_modules\\electron\\dist\\locales\\kn.pak', dest_path='', event_type='created', is_directory=False, is_synthetic=False) - argument should be a str or an os.PathLike object where __fspath__ returns a str, not 'FileCreatedEvent'
+Traceback (most recent call last):
+  File "modules\worker.py", line 110, in _process_file_async
+  File "pathlib\__init__.py", line 150, in __init__
+TypeError: argument should be a str or an os.PathLike object where __fspath__ returns a str, not 'FileCreatedEvent'
+2026-01-31 22:33:07 - FileClassifier - INFO - File queued: FileCreatedEvent(src_path='C:\\Users\\White\\Documents\\Project_Relog\\node_modules\\electron\\dist\\locales\\bn.pak', dest_path='', event_type='created', is_directory=False, is_synthetic=False)
+Processing error (Async): FileCreatedEvent(src_path='C:\\Users\\White\\Documents\\Project_Relog\\node_modules\\electron\\dist\\locales\\bn.pak', dest_path='', event_type='created', is_directory=False, is_synthetic=False) - argument should be a str or an os.PathLike object where __fspath__ returns a str, not 'FileCreatedEvent'
+Traceback (most recent call last):
+  File "modules\worker.py", line 110, in _process_file_async
+  File "pathlib\__init__.py", line 150, in __init__
+TypeError: argument should be a str or an os.PathLike object where __fspath__ returns a str, not 'FileCreatedEvent'
+2026-01-31 22:33:07 - FileClassifier - INFO - File queued: FileCreatedEvent(src_path='C:\\Users\\White\\Documents\\Project_Relog\\node_modules\\electron\\dist\\icudtl.dat', dest_path='', event_type='created', is_directory=False, is_synthetic=False)
+Processing error (Async): FileCreatedEvent(src_path='C:\\Users\\White\\Documents\\Project_Relog\\node_modules\\electron\\dist\\icudtl.dat', dest_path='', event_type='created', is_directory=False, is_synthetic=False) - argument should be a str or an os.PathLike object where __fspath__ returns a str, not 'FileCreatedEvent'
+Traceback (most recent call last):
+  File "modules\worker.py", line 110, in _process_file_async
+  File "pathlib\__init__.py", line 150, in __init__
+TypeError: argument should be a str or an os.PathLike object where __fspath__ returns a str, not 'FileCreatedEvent'
+2026-01-31 22:33:08 - FileClassifier - INFO - File queued: FileCreatedEvent(src_path='C:\\Users\\White\\Documents\\Project_Relog\\node_modules\\electron\\dist\\chrome_200_percent.pak', dest_path='', event_type='created', is_directory=False, is_synthetic=False)
+Processing error (Async): FileCreatedEvent(src_path='C:\\Users\\White\\Documents\\Project_Relog\\node_modules\\electron\\dist\\chrome_200_percent.pak', dest_path='', event_type='created', is_directory=False, is_synthetic=False) - argument should be a str or an os.PathLike object where __fspath__ returns a str, not 'FileCreatedEvent'
+Traceback (most recent call last):
+  File "modules\worker.py", line 110, in _process_file_async
+  File "pathlib\__init__.py", line 150, in __init__
+TypeError: argument should be a str or an os.PathLike object where __fspath__ returns a str, not 'FileCreatedEvent'
+2026-01-31 22:33:08 - FileClassifier - INFO - File queued: FileCreatedEvent(src_path='C:\\Users\\White\\Documents\\Project_Relog\\node_modules\\electron\\dist\\locales\\fa.pak', dest_path='', event_type='created', is_directory=False, is_synthetic=False)
+Processing error (Async): FileCreatedEvent(src_path='C:\\Users\\White\\Documents\\Project_Relog\\node_modules\\electron\\dist\\locales\\fa.pak', dest_path='', event_type='created', is_directory=False, is_synthetic=False) - argument should be a str or an os.PathLike object where __fspath__ returns a str, not 'FileCreatedEvent'
+Traceback (most recent call last):
+  File "modules\worker.py", line 110, in _process_file_async
+  File "pathlib\__init__.py", line 150, in __init__
+TypeError: argument should be a str or an os.PathLike object where __fspath__ returns a str, not 'FileCreatedEvent'
+2026-01-31 22:33:08 - FileClassifier - INFO - File queued: FileCreatedEvent(src_path='C:\\Users\\White\\Documents\\Project_Relog\\node_modules\\electron\\dist\\resources.pak', dest_path='', event_type='created', is_directory=False, is_synthetic=False)
+Processing error (Async): FileCreatedEvent(src_path='C:\\Users\\White\\Documents\\Project_Relog\\node_modules\\electron\\dist\\resources.pak', dest_path='', event_type='created', is_directory=False, is_synthetic=False) - argument should be a str or an os.PathLike object where __fspath__ returns a str, not 'FileCreatedEvent'
+Traceback (most recent call last):
+  File "modules\worker.py", line 110, in _process_file_async
+  File "pathlib\__init__.py", line 150, in __init__
+TypeError: argument should be a str or an os.PathLike object where __fspath__ returns a str, not 'FileCreatedEvent'
+2026-01-31 22:33:08 - FileClassifier - INFO - File queued: FileCreatedEvent(src_path='C:\\Users\\White\\Documents\\Project_Relog\\node_modules\\electron\\dist\\d3dcompiler_47.dll', dest_path='', event_type='created', is_directory=False, is_synthetic=False)
+Processing error (Async): FileCreatedEvent(src_path='C:\\Users\\White\\Documents\\Project_Relog\\node_modules\\electron\\dist\\d3dcompiler_47.dll', dest_path='', event_type='created', is_directory=False, is_synthetic=False) - argument should be a str or an os.PathLike object where __fspath__ returns a str, not 'FileCreatedEvent'
+Traceback (most recent call last):
+  File "modules\worker.py", line 110, in _process_file_async
+  File "pathlib\__init__.py", line 150, in __init__
+TypeError: argument should be a str or an os.PathLike object where __fspath__ returns a str, not 'FileCreatedEvent'
+2026-01-31 22:33:09 - FileClassifier - INFO - File queued: FileCreatedEvent(src_path='C:\\Users\\White\\Documents\\Project_Relog\\node_modules\\electron\\dist\\locales\\en-GB.pak', dest_path='', event_type='created', is_directory=False, is_synthetic=False)
+Processing error (Async): FileCreatedEvent(src_path='C:\\Users\\White\\Documents\\Project_Relog\\node_modules\\electron\\dist\\locales\\en-GB.pak', dest_path='', event_type='created', is_directory=False, is_synthetic=False) - argument should be a str or an os.PathLike object where __fspath__ returns a str, not 'FileCreatedEvent'
+Traceback (most recent call last):
+  File "modules\worker.py", line 110, in _process_file_async
+  File "pathlib\__init__.py", line 150, in __init__
+TypeError: argument should be a str or an os.PathLike object where __fspath__ returns a str, not 'FileCreatedEvent'
+2026-01-31 22:33:09 - FileClassifier - INFO - File queued: FileCreatedEvent(src_path='C:\\Users\\White\\Documents\\Project_Relog\\node_modules\\electron\\dist\\locales\\es.pak', dest_path='', event_type='created', is_directory=False, is_synthetic=False)
+Processing error (Async): FileCreatedEvent(src_path='C:\\Users\\White\\Documents\\Project_Relog\\node_modules\\electron\\dist\\locales\\es.pak', dest_path='', event_type='created', is_directory=False, is_synthetic=False) - argument should be a str or an os.PathLike object where __fspath__ returns a str, not 'FileCreatedEvent'
+Traceback (most recent call last):
+  File "modules\worker.py", line 110, in _process_file_async
+  File "pathlib\__init__.py", line 150, in __init__
+TypeError: argument should be a str or an os.PathLike object where __fspath__ returns a str, not 'FileCreatedEvent'
+2026-01-31 22:33:09 - FileClassifier - INFO - File queued: FileCreatedEvent(src_path='C:\\Users\\White\\Documents\\Project_Relog\\node_modules\\electron\\dist\\locales\\en-US.pak', dest_path='', event_type='created', is_directory=False, is_synthetic=False)
+Processing error (Async): FileCreatedEvent(src_path='C:\\Users\\White\\Documents\\Project_Relog\\node_modules\\electron\\dist\\locales\\en-US.pak', dest_path='', event_type='created', is_directory=False, is_synthetic=False) - argument should be a str or an os.PathLike object where __fspath__ returns a str, not 'FileCreatedEvent'
+Traceback (most recent call last):
+  File "modules\worker.py", line 110, in _process_file_async
+  File "pathlib\__init__.py", line 150, in __init__
+TypeError: argument should be a str or an os.PathLike object where __fspath__ returns a str, not 'FileCreatedEvent'
+2026-01-31 22:33:09 - FileClassifier - INFO - File queued: FileCreatedEvent(src_path='C:\\Users\\White\\Documents\\Project_Relog\\node_modules\\electron\\dist\\locales\\id.pak', dest_path='', event_type='created', is_directory=False, is_synthetic=False)
+Processing error (Async): FileCreatedEvent(src_path='C:\\Users\\White\\Documents\\Project_Relog\\node_modules\\electron\\dist\\locales\\id.pak', dest_path='', event_type='created', is_directory=False, is_synthetic=False) - argument should be a str or an os.PathLike object where __fspath__ returns a str, not 'FileCreatedEvent'
+Traceback (most recent call last):
+  File "modules\worker.py", line 110, in _process_file_async
+  File "pathlib\__init__.py", line 150, in __init__
+TypeError: argument should be a str or an os.PathLike object where __fspath__ returns a str, not 'FileCreatedEvent'
+2026-01-31 22:33:09 - FileClassifier - INFO - File queued: FileCreatedEvent(src_path='C:\\Users\\White\\Documents\\Project_Relog\\node_modules\\electron\\dist\\dxil.dll', dest_path='', event_type='created', is_directory=False, is_synthetic=False)
+Processing error (Async): FileCreatedEvent(src_path='C:\\Users\\White\\Documents\\Project_Relog\\node_modules\\electron\\dist\\dxil.dll', dest_path='', event_type='created', is_directory=False, is_synthetic=False) - argument should be a str or an os.PathLike object where __fspath__ returns a str, not 'FileCreatedEvent'
+Traceback (most recent call last):
+  File "modules\worker.py", line 110, in _process_file_async
+  File "pathlib\__init__.py", line 150, in __init__
+TypeError: argument should be a str or an os.PathLike object where __fspath__ returns a str, not 'FileCreatedEvent'
+2026-01-31 22:33:09 - FileClassifier - INFO - File queued: FileCreatedEvent(src_path='C:\\Users\\White\\Documents\\Project_Relog\\node_modules\\electron\\dist\\LICENSE', dest_path='', event_type='created', is_directory=False, is_synthetic=False)
+Processing error (Async): FileCreatedEvent(src_path='C:\\Users\\White\\Documents\\Project_Relog\\node_modules\\electron\\dist\\LICENSE', dest_path='', event_type='created', is_directory=False, is_synthetic=False) - argument should be a str or an os.PathLike object where __fspath__ returns a str, not 'FileCreatedEvent'
+Traceback (most recent call last):
+  File "modules\worker.py", line 110, in _process_file_async
+  File "pathlib\__init__.py", line 150, in __init__
+TypeError: argument should be a str or an os.PathLike object where __fspath__ returns a str, not 'FileCreatedEvent'
+2026-01-31 22:33:09 - FileClassifier - INFO - File queued: FileCreatedEvent(src_path='C:\\Users\\White\\Documents\\Project_Relog\\node_modules\\electron\\dist\\locales\\cs.pak', dest_path='', event_type='created', is_directory=False, is_synthetic=False)
+Processing error (Async): FileCreatedEvent(src_path='C:\\Users\\White\\Documents\\Project_Relog\\node_modules\\electron\\dist\\locales\\cs.pak', dest_path='', event_type='created', is_directory=False, is_synthetic=False) - argument should be a str or an os.PathLike object where __fspath__ returns a str, not 'FileCreatedEvent'
+Traceback (most recent call last):
+  File "modules\worker.py", line 110, in _process_file_async
+  File "pathlib\__init__.py", line 150, in __init__
+TypeError: argument should be a str or an os.PathLike object where __fspath__ returns a str, not 'FileCreatedEvent'
+2026-01-31 22:33:09 - FileClassifier - INFO - File queued: FileCreatedEvent(src_path='C:\\Users\\White\\Documents\\Project_Relog\\node_modules\\electron\\dist\\dxcompiler.dll', dest_path='', event_type='created', is_directory=False, is_synthetic=False)
+Processing error (Async): FileCreatedEvent(src_path='C:\\Users\\White\\Documents\\Project_Relog\\node_modules\\electron\\dist\\dxcompiler.dll', dest_path='', event_type='created', is_directory=False, is_synthetic=False) - argument should be a str or an os.PathLike object where __fspath__ returns a str, not 'FileCreatedEvent'
+Traceback (most recent call last):
+  File "modules\worker.py", line 110, in _process_file_async
+  File "pathlib\__init__.py", line 150, in __init__
+TypeError: argument should be a str or an os.PathLike object where __fspath__ returns a str, not 'FileCreatedEvent'
+2026-01-31 22:33:11 - FileClassifier - INFO - File queued: FileCreatedEvent(src_path='C:\\Users\\White\\Documents\\Project_Relog\\node_modules\\electron\\dist\\locales\\sr.pak', dest_path='', event_type='created', is_directory=False, is_synthetic=False)
+Processing error (Async): FileCreatedEvent(src_path='C:\\Users\\White\\Documents\\Project_Relog\\node_modules\\electron\\dist\\locales\\sr.pak', dest_path='', event_type='created', is_directory=False, is_synthetic=False) - argument should be a str or an os.PathLike object where __fspath__ returns a str, not 'FileCreatedEvent'
+Traceback (most recent call last):
+  File "modules\worker.py", line 110, in _process_file_async
+  File "pathlib\__init__.py", line 150, in __init__
+TypeError: argument should be a str or an os.PathLike object where __fspath__ returns a str, not 'FileCreatedEvent'
+2026-01-31 22:33:12 - FileClassifier - INFO - File queued: FileCreatedEvent(src_path='C:\\Users\\White\\Documents\\Project_Relog\\node_modules\\electron\\dist\\locales\\sw.pak', dest_path='', event_type='created', is_directory=False, is_synthetic=False)
+Processing error (Async): FileCreatedEvent(src_path='C:\\Users\\White\\Documents\\Project_Relog\\node_modules\\electron\\dist\\locales\\sw.pak', dest_path='', event_type='created', is_directory=False, is_synthetic=False) - argument should be a str or an os.PathLike object where __fspath__ returns a str, not 'FileCreatedEvent'
+Traceback (most recent call last):
+  File "modules\worker.py", line 110, in _process_file_async
+  File "pathlib\__init__.py", line 150, in __init__
+TypeError: argument should be a str or an os.PathLike object where __fspath__ returns a str, not 'FileCreatedEvent'
+2026-01-31 22:33:12 - FileClassifier - INFO - File queued: FileCreatedEvent(src_path='C:\\Users\\White\\Documents\\Project_Relog\\node_modules\\electron\\dist\\locales\\zh-TW.pak', dest_path='', event_type='created', is_directory=False, is_synthetic=False)
+Processing error (Async): FileCreatedEvent(src_path='C:\\Users\\White\\Documents\\Project_Relog\\node_modules\\electron\\dist\\locales\\zh-TW.pak', dest_path='', event_type='created', is_directory=False, is_synthetic=False) - argument should be a str or an os.PathLike object where __fspath__ returns a str, not 'FileCreatedEvent'
+Traceback (most recent call last):
+  File "modules\worker.py", line 110, in _process_file_async
+  File "pathlib\__init__.py", line 150, in __init__
+TypeError: argument should be a str or an os.PathLike object where __fspath__ returns a str, not 'FileCreatedEvent'
+2026-01-31 22:33:12 - FileClassifier - INFO - File queued: FileCreatedEvent(src_path='C:\\Users\\White\\Documents\\Project_Relog\\node_modules\\electron\\dist\\locales\\gu.pak', dest_path='', event_type='created', is_directory=False, is_synthetic=False)
+Processing error (Async): FileCreatedEvent(src_path='C:\\Users\\White\\Documents\\Project_Relog\\node_modules\\electron\\dist\\locales\\gu.pak', dest_path='', event_type='created', is_directory=False, is_synthetic=False) - argument should be a str or an os.PathLike object where __fspath__ returns a str, not 'FileCreatedEvent'
+Traceback (most recent call last):
+  File "modules\worker.py", line 110, in _process_file_async
+  File "pathlib\__init__.py", line 150, in __init__
+TypeError: argument should be a str or an os.PathLike object where __fspath__ returns a str, not 'FileCreatedEvent'
+2026-01-31 22:33:12 - FileClassifier - INFO - File queued: FileCreatedEvent(src_path='C:\\Users\\White\\Documents\\Project_Relog\\node_modules\\electron\\dist\\locales\\da.pak', dest_path='', event_type='created', is_directory=False, is_synthetic=False)
+Processing error (Async): FileCreatedEvent(src_path='C:\\Users\\White\\Documents\\Project_Relog\\node_modules\\electron\\dist\\locales\\da.pak', dest_path='', event_type='created', is_directory=False, is_synthetic=False) - argument should be a str or an os.PathLike object where __fspath__ returns a str, not 'FileCreatedEvent'
+Traceback (most recent call last):
+  File "modules\worker.py", line 110, in _process_file_async
+  File "pathlib\__init__.py", line 150, in __init__
+TypeError: argument should be a str or an os.PathLike object where __fspath__ returns a str, not 'FileCreatedEvent'
+2026-01-31 22:33:12 - FileClassifier - INFO - File queued: FileCreatedEvent(src_path='C:\\Users\\White\\Documents\\Project_Relog\\node_modules\\electron\\dist\\locales\\ta.pak', dest_path='', event_type='created', is_directory=False, is_synthetic=False)
+Processing error (Async): FileCreatedEvent(src_path='C:\\Users\\White\\Documents\\Project_Relog\\node_modules\\electron\\dist\\locales\\ta.pak', dest_path='', event_type='created', is_directory=False, is_synthetic=False) - argument should be a str or an os.PathLike object where __fspath__ returns a str, not 'FileCreatedEvent'
+Traceback (most recent call last):
+  File "modules\worker.py", line 110, in _process_file_async
+  File "pathlib\__init__.py", line 150, in __init__
+TypeError: argument should be a str or an os.PathLike object where __fspath__ returns a str, not 'FileCreatedEvent'
+2026-01-31 22:33:12 - FileClassifier - INFO - File queued: FileCreatedEvent(src_path='C:\\Users\\White\\Documents\\Project_Relog\\node_modules\\electron\\dist\\vk_swiftshader_icd.json', dest_path='', event_type='created', is_directory=False, is_synthetic=False)
+Processing error (Async): FileCreatedEvent(src_path='C:\\Users\\White\\Documents\\Project_Relog\\node_modules\\electron\\dist\\vk_swiftshader_icd.json', dest_path='', event_type='created', is_directory=False, is_synthetic=False) - argument should be a str or an os.PathLike object where __fspath__ returns a str, not 'FileCreatedEvent'
+Traceback (most recent call last):
+  File "modules\worker.py", line 110, in _process_file_async
+  File "pathlib\__init__.py", line 150, in __init__
+TypeError: argument should be a str or an os.PathLike object where __fspath__ returns a str, not 'FileCreatedEvent'
+2026-01-31 22:33:12 - FileClassifier - INFO - File queued: FileCreatedEvent(src_path='C:\\Users\\White\\Documents\\Project_Relog\\node_modules\\electron\\dist\\LICENSES.chromium.html', dest_path='', event_type='created', is_directory=False, is_synthetic=False)
+Processing error (Async): FileCreatedEvent(src_path='C:\\Users\\White\\Documents\\Project_Relog\\node_modules\\electron\\dist\\LICENSES.chromium.html', dest_path='', event_type='created', is_directory=False, is_synthetic=False) - argument should be a str or an os.PathLike object where __fspath__ returns a str, not 'FileCreatedEvent'
+Traceback (most recent call last):
+  File "modules\worker.py", line 110, in _process_file_async
+  File "pathlib\__init__.py", line 150, in __init__
+TypeError: argument should be a str or an os.PathLike object where __fspath__ returns a str, not 'FileCreatedEvent'
+2026-01-31 22:33:13 - FileClassifier - INFO - File queued: FileCreatedEvent(src_path='C:\\Users\\White\\Documents\\Project_Relog\\node_modules\\electron\\dist\\locales\\lv.pak', dest_path='', event_type='created', is_directory=False, is_synthetic=False)
+Processing error (Async): FileCreatedEvent(src_path='C:\\Users\\White\\Documents\\Project_Relog\\node_modules\\electron\\dist\\locales\\lv.pak', dest_path='', event_type='created', is_directory=False, is_synthetic=False) - argument should be a str or an os.PathLike object where __fspath__ returns a str, not 'FileCreatedEvent'
+Traceback (most recent call last):
+  File "modules\worker.py", line 110, in _process_file_async
+  File "pathlib\__init__.py", line 150, in __init__
+TypeError: argument should be a str or an os.PathLike object where __fspath__ returns a str, not 'FileCreatedEvent'
+2026-01-31 22:33:13 - FileClassifier - INFO - File queued: FileCreatedEvent(src_path='C:\\Users\\White\\Documents\\Project_Relog\\node_modules\\electron\\dist\\locales\\lt.pak', dest_path='', event_type='created', is_directory=False, is_synthetic=False)
+Processing error (Async): FileCreatedEvent(src_path='C:\\Users\\White\\Documents\\Project_Relog\\node_modules\\electron\\dist\\locales\\lt.pak', dest_path='', event_type='created', is_directory=False, is_synthetic=False) - argument should be a str or an os.PathLike object where __fspath__ returns a str, not 'FileCreatedEvent'
+Traceback (most recent call last):
+  File "modules\worker.py", line 110, in _process_file_async
+  File "pathlib\__init__.py", line 150, in __init__
+TypeError: argument should be a str or an os.PathLike object where __fspath__ returns a str, not 'FileCreatedEvent'
+2026-01-31 22:33:13 - FileClassifier - INFO - File queued: FileCreatedEvent(src_path='C:\\Users\\White\\Documents\\Project_Relog\\node_modules\\electron\\dist\\locales\\ar.pak', dest_path='', event_type='created', is_directory=False, is_synthetic=False)
+Processing error (Async): FileCreatedEvent(src_path='C:\\Users\\White\\Documents\\Project_Relog\\node_modules\\electron\\dist\\locales\\ar.pak', dest_path='', event_type='created', is_directory=False, is_synthetic=False) - argument should be a str or an os.PathLike object where __fspath__ returns a str, not 'FileCreatedEvent'
+Traceback (most recent call last):
+  File "modules\worker.py", line 110, in _process_file_async
+  File "pathlib\__init__.py", line 150, in __init__
+TypeError: argument should be a str or an os.PathLike object where __fspath__ returns a str, not 'FileCreatedEvent'
+2026-01-31 22:33:13 - FileClassifier - INFO - File queued: FileCreatedEvent(src_path='C:\\Users\\White\\Documents\\Project_Relog\\node_modules\\electron\\dist\\locales\\el.pak', dest_path='', event_type='created', is_directory=False, is_synthetic=False)
+Processing error (Async): FileCreatedEvent(src_path='C:\\Users\\White\\Documents\\Project_Relog\\node_modules\\electron\\dist\\locales\\el.pak', dest_path='', event_type='created', is_directory=False, is_synthetic=False) - argument should be a str or an os.PathLike object where __fspath__ returns a str, not 'FileCreatedEvent'
+Traceback (most recent call last):
+  File "modules\worker.py", line 110, in _process_file_async
+  File "pathlib\__init__.py", line 150, in __init__
+TypeError: argument should be a str or an os.PathLike object where __fspath__ returns a str, not 'FileCreatedEvent'
+2026-01-31 22:33:13 - FileClassifier - INFO - File queued: FileCreatedEvent(src_path='C:\\Users\\White\\Documents\\Project_Relog\\node_modules\\electron\\dist\\locales\\fil.pak', dest_path='', event_type='created', is_directory=False, is_synthetic=False)
+Processing error (Async): FileCreatedEvent(src_path='C:\\Users\\White\\Documents\\Project_Relog\\node_modules\\electron\\dist\\locales\\fil.pak', dest_path='', event_type='created', is_directory=False, is_synthetic=False) - argument should be a str or an os.PathLike object where __fspath__ returns a str, not 'FileCreatedEvent'
+Traceback (most recent call last):
+  File "modules\worker.py", line 110, in _process_file_async
+  File "pathlib\__init__.py", line 150, in __init__
+TypeError: argument should be a str or an os.PathLike object where __fspath__ returns a str, not 'FileCreatedEvent'
+2026-01-31 22:33:13 - FileClassifier - INFO - File queued: FileCreatedEvent(src_path='C:\\Users\\White\\Documents\\Project_Relog\\node_modules\\electron\\dist\\locales\\ro.pak', dest_path='', event_type='created', is_directory=False, is_synthetic=False)
+Processing error (Async): FileCreatedEvent(src_path='C:\\Users\\White\\Documents\\Project_Relog\\node_modules\\electron\\dist\\locales\\ro.pak', dest_path='', event_type='created', is_directory=False, is_synthetic=False) - argument should be a str or an os.PathLike object where __fspath__ returns a str, not 'FileCreatedEvent'
+Traceback (most recent call last):
+  File "modules\worker.py", line 110, in _process_file_async
+  File "pathlib\__init__.py", line 150, in __init__
+TypeError: argument should be a str or an os.PathLike object where __fspath__ returns a str, not 'FileCreatedEvent'
+2026-01-31 22:33:13 - FileClassifier - INFO - File queued: FileCreatedEvent(src_path='C:\\Users\\White\\Documents\\Project_Relog\\node_modules\\electron\\dist\\locales\\fr.pak', dest_path='', event_type='created', is_directory=False, is_synthetic=False)
+Processing error (Async): FileCreatedEvent(src_path='C:\\Users\\White\\Documents\\Project_Relog\\node_modules\\electron\\dist\\locales\\fr.pak', dest_path='', event_type='created', is_directory=False, is_synthetic=False) - argument should be a str or an os.PathLike object where __fspath__ returns a str, not 'FileCreatedEvent'
+Traceback (most recent call last):
+  File "modules\worker.py", line 110, in _process_file_async
+  File "pathlib\__init__.py", line 150, in __init__
+TypeError: argument should be a str or an os.PathLike object where __fspath__ returns a str, not 'FileCreatedEvent'
+2026-01-31 22:33:13 - FileClassifier - INFO - File queued: FileCreatedEvent(src_path='C:\\Users\\White\\Documents\\Project_Relog\\node_modules\\electron\\dist\\locales\\ja.pak', dest_path='', event_type='created', is_directory=False, is_synthetic=False)
+Processing error (Async): FileCreatedEvent(src_path='C:\\Users\\White\\Documents\\Project_Relog\\node_modules\\electron\\dist\\locales\\ja.pak', dest_path='', event_type='created', is_directory=False, is_synthetic=False) - argument should be a str or an os.PathLike object where __fspath__ returns a str, not 'FileCreatedEvent'
+Traceback (most recent call last):
+  File "modules\worker.py", line 110, in _process_file_async
+  File "pathlib\__init__.py", line 150, in __init__
+TypeError: argument should be a str or an os.PathLike object where __fspath__ returns a str, not 'FileCreatedEvent'
+2026-01-31 22:33:13 - FileClassifier - INFO - File queued: FileCreatedEvent(src_path='C:\\Users\\White\\Documents\\Project_Relog\\node_modules\\electron\\dist\\locales\\ca.pak', dest_path='', event_type='created', is_directory=False, is_synthetic=False)
+Processing error (Async): FileCreatedEvent(src_path='C:\\Users\\White\\Documents\\Project_Relog\\node_modules\\electron\\dist\\locales\\ca.pak', dest_path='', event_type='created', is_directory=False, is_synthetic=False) - argument should be a str or an os.PathLike object where __fspath__ returns a str, not 'FileCreatedEvent'
+Traceback (most recent call last):
+  File "modules\worker.py", line 110, in _process_file_async
+  File "pathlib\__init__.py", line 150, in __init__
+TypeError: argument should be a str or an os.PathLike object where __fspath__ returns a str, not 'FileCreatedEvent'
+2026-01-31 22:33:13 - FileClassifier - INFO - File queued: FileCreatedEvent(src_path='C:\\Users\\White\\Documents\\Project_Relog\\node_modules\\electron\\dist\\electron.exe', dest_path='', event_type='created', is_directory=False, is_synthetic=False)
+Processing error (Async): FileCreatedEvent(src_path='C:\\Users\\White\\Documents\\Project_Relog\\node_modules\\electron\\dist\\electron.exe', dest_path='', event_type='created', is_directory=False, is_synthetic=False) - argument should be a str or an os.PathLike object where __fspath__ returns a str, not 'FileCreatedEvent'
+Traceback (most recent call last):
+  File "modules\worker.py", line 110, in _process_file_async
+  File "pathlib\__init__.py", line 150, in __init__
+TypeError: argument should be a str or an os.PathLike object where __fspath__ returns a str, not 'FileCreatedEvent'
+2026-01-31 22:33:24 - FileClassifier - INFO - File queued: FileCreatedEvent(src_path='C:\\Users\\White\\Documents\\Project_Relog\\node_modules\\electron\\dist\\locales\\sv.pak', dest_path='', event_type='created', is_directory=False, is_synthetic=False)
+2026-01-31 22:33:24 - FileClassifier - INFO - File queued: FileCreatedEvent(src_path='C:\\Users\\White\\Documents\\Project_Relog\\node_modules\\electron\\dist\\locales\\tr.pak', dest_path='', event_type='created', is_directory=False, is_synthetic=False)
+2026-01-31 22:33:24 - FileClassifier - INFO - File queued: FileCreatedEvent(src_path='C:\\Users\\White\\Documents\\Project_Relog\\node_modules\\electron\\dist\\locales\\ur.pak', dest_path='', event_type='created', is_directory=False, is_synthetic=False)
+Processing error (Async): FileCreatedEvent(src_path='C:\\Users\\White\\Documents\\Project_Relog\\node_modules\\electron\\dist\\locales\\sv.pak', dest_path='', event_type='created', is_directory=False, is_synthetic=False) - argument should be a str or an os.PathLike object where __fspath__ returns a str, not 'FileCreatedEvent'
+Traceback (most recent call last):
+  File "modules\worker.py", line 110, in _process_file_async
+  File "pathlib\__init__.py", line 150, in __init__
+TypeError: argument should be a str or an os.PathLike object where __fspath__ returns a str, not 'FileCreatedEvent'
+2026-01-31 22:33:24 - FileClassifier - INFO - File queued: FileCreatedEvent(src_path='C:\\Users\\White\\Documents\\Project_Relog\\node_modules\\electron\\dist\\locales\\am.pak', dest_path='', event_type='created', is_directory=False, is_synthetic=False)
+Processing error (Async): FileCreatedEvent(src_path='C:\\Users\\White\\Documents\\Project_Relog\\node_modules\\electron\\dist\\locales\\tr.pak', dest_path='', event_type='created', is_directory=False, is_synthetic=False) - argument should be a str or an os.PathLike object where __fspath__ returns a str, not 'FileCreatedEvent'
+Traceback (most recent call last):
+  File "modules\worker.py", line 110, in _process_file_async
+  File "pathlib\__init__.py", line 150, in __init__
+TypeError: argument should be a str or an os.PathLike object where __fspath__ returns a str, not 'FileCreatedEvent'
+Processing error (Async): FileCreatedEvent(src_path='C:\\Users\\White\\Documents\\Project_Relog\\node_modules\\electron\\dist\\locales\\ur.pak', dest_path='', event_type='created', is_directory=False, is_synthetic=False) - argument should be a str or an os.PathLike object where __fspath__ returns a str, not 'FileCreatedEvent'
+Traceback (most recent call last):
+  File "modules\worker.py", line 110, in _process_file_async
+  File "pathlib\__init__.py", line 150, in __init__
+TypeError: argument should be a str or an os.PathLike object where __fspath__ returns a str, not 'FileCreatedEvent'
+Processing error (Async): FileCreatedEvent(src_path='C:\\Users\\White\\Documents\\Project_Relog\\node_modules\\electron\\dist\\locales\\am.pak', dest_path='', event_type='created', is_directory=False, is_synthetic=False) - argument should be a str or an os.PathLike object where __fspath__ returns a str, not 'FileCreatedEvent'
+Traceback (most recent call last):
+  File "modules\worker.py", line 110, in _process_file_async
+  File "pathlib\__init__.py", line 150, in __init__
+TypeError: argument should be a str or an os.PathLike object where __fspath__ returns a str, not 'FileCreatedEvent'
+2026-01-31 22:33:24 - FileClassifier - INFO - File queued: FileCreatedEvent(src_path='C:\\Users\\White\\Documents\\Project_Relog\\node_modules\\electron\\dist\\locales\\et.pak', dest_path='', event_type='created', is_directory=False, is_synthetic=False)
+Processing error (Async): FileCreatedEvent(src_path='C:\\Users\\White\\Documents\\Project_Relog\\node_modules\\electron\\dist\\locales\\et.pak', dest_path='', event_type='created', is_directory=False, is_synthetic=False) - argument should be a str or an os.PathLike object where __fspath__ returns a str, not 'FileCreatedEvent'
+Traceback (most recent call last):
+  File "modules\worker.py", line 110, in _process_file_async
+  File "pathlib\__init__.py", line 150, in __init__
+TypeError: argument should be a str or an os.PathLike object where __fspath__ returns a str, not 'FileCreatedEvent'
+2026-01-31 22:33:24 - FileClassifier - INFO - File queued: FileCreatedEvent(src_path='C:\\Users\\White\\Documents\\Project_Relog\\node_modules\\electron\\dist\\locales\\nl.pak', dest_path='', event_type='created', is_directory=False, is_synthetic=False)
+Processing error (Async): FileCreatedEvent(src_path='C:\\Users\\White\\Documents\\Project_Relog\\node_modules\\electron\\dist\\locales\\nl.pak', dest_path='', event_type='created', is_directory=False, is_synthetic=False) - argument should be a str or an os.PathLike object where __fspath__ returns a str, not 'FileCreatedEvent'
+Traceback (most recent call last):
+  File "modules\worker.py", line 110, in _process_file_async
+  File "pathlib\__init__.py", line 150, in __init__
+TypeError: argument should be a str or an os.PathLike object where __fspath__ returns a str, not 'FileCreatedEvent'
+2026-01-31 22:33:24 - FileClassifier - INFO - File queued: FileCreatedEvent(src_path='C:\\Users\\White\\Documents\\Project_Relog\\node_modules\\electron\\dist\\locales\\fi.pak', dest_path='', event_type='created', is_directory=False, is_synthetic=False)
+Processing error (Async): FileCreatedEvent(src_path='C:\\Users\\White\\Documents\\Project_Relog\\node_modules\\electron\\dist\\locales\\fi.pak', dest_path='', event_type='created', is_directory=False, is_synthetic=False) - argument should be a str or an os.PathLike object where __fspath__ returns a str, not 'FileCreatedEvent'
+Traceback (most recent call last):
+  File "modules\worker.py", line 110, in _process_file_async
+  File "pathlib\__init__.py", line 150, in __init__
+TypeError: argument should be a str or an os.PathLike object where __fspath__ returns a str, not 'FileCreatedEvent'
+2026-01-31 22:33:24 - FileClassifier - INFO - File queued: FileCreatedEvent(src_path='C:\\Users\\White\\Documents\\Project_Relog\\node_modules\\electron\\dist\\locales\\ml.pak', dest_path='', event_type='created', is_directory=False, is_synthetic=False)
+Processing error (Async): FileCreatedEvent(src_path='C:\\Users\\White\\Documents\\Project_Relog\\node_modules\\electron\\dist\\locales\\ml.pak', dest_path='', event_type='created', is_directory=False, is_synthetic=False) - argument should be a str or an os.PathLike object where __fspath__ returns a str, not 'FileCreatedEvent'
+Traceback (most recent call last):
+  File "modules\worker.py", line 110, in _process_file_async
+  File "pathlib\__init__.py", line 150, in __init__
+TypeError: argument should be a str or an os.PathLike object where __fspath__ returns a str, not 'FileCreatedEvent'
+2026-01-31 22:33:24 - FileClassifier - INFO - File queued: FileCreatedEvent(src_path='C:\\Users\\White\\Documents\\Project_Relog\\node_modules\\electron\\dist\\locales\\pl.pak', dest_path='', event_type='created', is_directory=False, is_synthetic=False)
+Processing error (Async): FileCreatedEvent(src_path='C:\\Users\\White\\Documents\\Project_Relog\\node_modules\\electron\\dist\\locales\\pl.pak', dest_path='', event_type='created', is_directory=False, is_synthetic=False) - argument should be a str or an os.PathLike object where __fspath__ returns a str, not 'FileCreatedEvent'
+Traceback (most recent call last):
+  File "modules\worker.py", line 110, in _process_file_async
+  File "pathlib\__init__.py", line 150, in __init__
+TypeError: argument should be a str or an os.PathLike object where __fspath__ returns a str, not 'FileCreatedEvent'
+2026-01-31 22:33:25 - FileClassifier - INFO - File queued: FileCreatedEvent(src_path='C:\\Users\\White\\Documents\\Project_Relog\\node_modules\\electron\\dist\\chrome_100_percent.pak', dest_path='', event_type='created', is_directory=False, is_synthetic=False)
+Processing error (Async): FileCreatedEvent(src_path='C:\\Users\\White\\Documents\\Project_Relog\\node_modules\\electron\\dist\\chrome_100_percent.pak', dest_path='', event_type='created', is_directory=False, is_synthetic=False) - argument should be a str or an os.PathLike object where __fspath__ returns a str, not 'FileCreatedEvent'
+Traceback (most recent call last):
+  File "modules\worker.py", line 110, in _process_file_async
+  File "pathlib\__init__.py", line 150, in __init__
+TypeError: argument should be a str or an os.PathLike object where __fspath__ returns a str, not 'FileCreatedEvent'
+2026-01-31 22:33:25 - FileClassifier - INFO - File queued: FileCreatedEvent(src_path='C:\\Users\\White\\Documents\\Project_Relog\\node_modules\\electron\\path.txt', dest_path='', event_type='created', is_directory=False, is_synthetic=False)
+Processing error (Async): FileCreatedEvent(src_path='C:\\Users\\White\\Documents\\Project_Relog\\node_modules\\electron\\path.txt', dest_path='', event_type='created', is_directory=False, is_synthetic=False) - argument should be a str or an os.PathLike object where __fspath__ returns a str, not 'FileCreatedEvent'
+Traceback (most recent call last):
+  File "modules\worker.py", line 110, in _process_file_async
+  File "pathlib\__init__.py", line 150, in __init__
+TypeError: argument should be a str or an os.PathLike object where __fspath__ returns a str, not 'FileCreatedEvent'
+2026-01-31 22:33:29 - FileClassifier - INFO - File queued: DirCreatedEvent(src_path='C:\\Users\\White\\Documents\\Project_Relog\\electron', dest_path='', event_type='created', is_directory=True, is_synthetic=False)
+Processing error (Async): DirCreatedEvent(src_path='C:\\Users\\White\\Documents\\Project_Relog\\electron', dest_path='', event_type='created', is_directory=True, is_synthetic=False) - argument should be a str or an os.PathLike object where __fspath__ returns a str, not 'DirCreatedEvent'
+Traceback (most recent call last):
+  File "modules\worker.py", line 110, in _process_file_async
+  File "pathlib\__init__.py", line 150, in __init__
+TypeError: argument should be a str or an os.PathLike object where __fspath__ returns a str, not 'DirCreatedEvent'
+2026-01-31 22:33:38 - FileClassifier - INFO - Monitoring stopped
+2026-01-31 22:33:39 - FileClassifier - INFO - Monitoring started: C:/Users/White/Documents/무제
+2026-01-31 22:33:59 - FileClassifier - INFO - Monitoring stopped

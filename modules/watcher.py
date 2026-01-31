@@ -30,7 +30,7 @@ class FileWatcher(FileSystemEventHandler):
             on_created (Optional[Callable]): 파일 생성 시 실행할 콜백 함수
         """
         super().__init__()
-        self.on_created = on_created
+        self.creation_callback = on_created
         self.watched_files: List[str] = []
     
     def on_created(self, event: FileCreatedEvent) -> None:
@@ -47,9 +47,9 @@ class FileWatcher(FileSystemEventHandler):
         logger.info(f"새 파일 감지됨: {file_path}")
         self.watched_files.append(file_path)
         
-        if self.on_created:
+        if self.creation_callback:
             try:
-                self.on_created(file_path)
+                self.creation_callback(file_path)
             except Exception as e:
                 logger.error(f"콜백 실행 중 오류 발생: {e}")
     
