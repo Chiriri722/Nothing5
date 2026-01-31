@@ -15,8 +15,7 @@ from pathlib import Path
 from queue import Queue
 from datetime import datetime
 
-# 설정 저장을 위해 import
-from config.config import save_to_env, OPENAI_API_KEY, OPENAI_BASE_URL, LLM_MODEL
+import config.config as cfg
 
 logger = logging.getLogger(__name__)
 
@@ -50,9 +49,9 @@ class SettingsDialog(tk.Toplevel):
         self.resizable(False, False)
         self.parent = parent
 
-        self.api_key_var = tk.StringVar(value=OPENAI_API_KEY)
-        self.base_url_var = tk.StringVar(value=OPENAI_BASE_URL)
-        self.model_var = tk.StringVar(value=LLM_MODEL)
+        self.api_key_var = tk.StringVar(value=cfg.OPENAI_API_KEY)
+        self.base_url_var = tk.StringVar(value=cfg.OPENAI_BASE_URL)
+        self.model_var = tk.StringVar(value=cfg.LLM_MODEL)
         self.provider_var = tk.StringVar(value="OpenAI")
 
         self._setup_ui()
@@ -129,7 +128,7 @@ class SettingsDialog(tk.Toplevel):
             return
 
         try:
-            save_to_env(api_key, base_url, model)
+            cfg.save_to_env(api_key, base_url, model)
             messagebox.showinfo("성공", "설정이 저장되었습니다.\n프로그램이 새 설정을 사용하도록 업데이트됩니다.")
 
             # 부모 창에 설정 변경 알림 (재초기화 요청)
@@ -208,8 +207,7 @@ class FileClassifierGUI:
 
     def _check_initial_config(self):
         """초기 설정 확인 및 설정창 표시"""
-        from config.config import OPENAI_API_KEY
-        if not OPENAI_API_KEY:
+        if not cfg.OPENAI_API_KEY:
              if messagebox.askyesno("초기 설정", "API 키가 설정되지 않았습니다.\n지금 설정하시겠습니까?"):
                  self._show_settings()
     

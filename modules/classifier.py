@@ -20,14 +20,6 @@ try:
 except ImportError:
     pass
 
-from config.config import (
-    OPENAI_BASE_URL,
-    LLM_MODEL,
-    LLM_TEMPERATURE,
-    LLM_MAX_TOKENS,
-    TIMEOUT,
-    MAX_CONTENT_LENGTH,
-)
 import config.config as cfg
 from modules.history_db import ProcessingHistory
 from modules.llm.factory import create_llm_client
@@ -77,10 +69,10 @@ class FileClassifier:
             logger.error("OPENAI_API_KEY가 설정되지 않았습니다")
 
         self.base_url = base_url or cfg.OPENAI_BASE_URL
-        self.model = model or LLM_MODEL
-        self.temperature = LLM_TEMPERATURE
-        self.max_tokens = LLM_MAX_TOKENS
-        self.timeout = TIMEOUT
+        self.model = model or cfg.LLM_MODEL
+        self.temperature = cfg.LLM_TEMPERATURE
+        self.max_tokens = cfg.LLM_MAX_TOKENS
+        self.timeout = cfg.TIMEOUT
 
         try:
             self.llm_client = create_llm_client(
@@ -104,7 +96,7 @@ class FileClassifier:
 
     def _prepare_classification_prompt(self, filename: str, file_type: str, content: str) -> str:
         """Helper to prepare the prompt string."""
-        truncated_content = content[:MAX_CONTENT_LENGTH] if content else ""
+        truncated_content = content[:cfg.MAX_CONTENT_LENGTH] if content else ""
         content_length = len(content) if content else 0
 
         return CLASSIFICATION_PROMPT.format(
